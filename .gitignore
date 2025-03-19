@@ -1,0 +1,14 @@
+bin/
+obj/
+*.dll
+*.exe
+packages/
+*.suo
+*.user
+.vs/
+logs/
+*.log
+appsettings.json
+secrets/
+.vscode/
+.idea/
