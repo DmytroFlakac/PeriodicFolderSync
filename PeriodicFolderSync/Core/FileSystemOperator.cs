@@ -8,10 +8,10 @@ public class FileSystemOperator : IFileOperator, IFolderOperator
     private readonly IFileOperator _fileOperator;
     private readonly IFolderOperator _folderOperator;
 
-    public FileSystemOperator(ILogger logger, int retryCount = 3, TimeSpan? retryDelay = null)
+    public FileSystemOperator(ILogger logger, int retryCount = 3, TimeSpan? retryDelay = null, IFileSystem? fileSystem = null)
     {
-        _fileOperator = new FileOperator(logger, retryCount, retryDelay);
-        _folderOperator = new FolderOperator(_fileOperator, logger, retryCount, retryDelay);
+        _fileOperator = new FileOperator(logger,fileSystem, retryCount, retryDelay);
+        _folderOperator = new FolderOperator(_fileOperator, logger, fileSystem, retryCount, retryDelay);
     }
 
     public Task CopyFileAsync(string sourcePath, string destPath, bool overwrite = false) =>

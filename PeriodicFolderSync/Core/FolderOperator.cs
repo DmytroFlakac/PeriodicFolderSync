@@ -3,38 +3,51 @@ using PeriodicFolderSync.Interfaces;
 
 namespace PeriodicFolderSync.Core;
 
-public class FolderOperator(IFileOperator fileOperator, ILogger logger, int retryCount = 3, TimeSpan? retryDelay = null) :
-    FileSystemOperatorBase(logger, retryCount, retryDelay), 
+public class FolderOperator(
+    IFileOperator fileOperator, 
+    ILogger logger, 
+    IFileSystem? fileSystem = null,
+    int retryCount = 3, 
+    TimeSpan? retryDelay = null) :
+    FileSystemOperatorBase(logger, retryCount, retryDelay),
     IFolderOperator
 {
+    private readonly IFileSystem _fileSystem = fileSystem ?? new FileSystem();
+
     protected override void Validate(string sourcePath, string destPath, string operation, bool overwrite = false)
     {
         ValidatePaths(sourcePath, destPath, operation);
-        if(!File.Exists(sourcePath))
-            throw new FileNotFoundException($"Source file not found {sourcePath}");
-        if (File.Exists(destPath) && !overwrite)
-            throw new IOException($"Destination file already exists: {destPath}");
+        if(!_fileSystem.DirectoryExists(sourcePath))
+            throw new DirectoryNotFoundException($"Source directory not found {sourcePath}");
+        if (_fileSystem.DirectoryExists(destPath) && !overwrite)
+            throw new IOException($"Destination directory already exists: {destPath}");
     }
 
     public async Task CopyFolderAsync(string sourcePath, string destPath, bool overwrite = false, bool recursive = true)
     {
         Validate(sourcePath, destPath, nameof(CopyFolderAsync), overwrite);
         
-        if (Directory.Exists(destPath) && overwrite)
+        if (_fileSystem.DirectoryExists(destPath) && overwrite)
             await DeleteFolderAsync(destPath, recursive);
 
-        Directory.CreateDirectory(destPath);
-        foreach (var file in Directory.EnumerateFiles(sourcePath))
+        _fileSystem.CreateDirectory(destPath);
+        
+        foreach (var file in _fileSystem.GetFiles(sourcePath))
         {
             string destFile = Path.Combine(destPath, Path.GetFileName(file));
             await fileOperator.CopyFileAsync(file, destFile, overwrite);
+            // await WithRetryAsync(() => fileOperator.CopyFileAsync(file, destFile, overwrite), 
+            //     $"Copy file from {file} to {destFile}");
         }
+        
         if (recursive)
         {
-            foreach (var dir in Directory.EnumerateDirectories(sourcePath))
+            foreach (var dir in _fileSystem.GetDirectories(sourcePath))
             {
                 string destDir = Path.Combine(destPath, Path.GetFileName(dir));
                 await CopyFolderAsync(dir, destDir, overwrite, recursive);
+                // await WithRetryAsync(() => CopyFolderAsync(dir, destDir, overwrite, recursive), 
+                //     $"Copy folder from {dir} to {destDir}");
             }
         }
     }
@@ -42,10 +55,10 @@ public class FolderOperator(IFileOperator fileOperator, ILogger logger, int retr
     public async Task DeleteFolderAsync(string path, bool recursive = true)
     {
         ValidatePath(path, nameof(DeleteFolderAsync));
-        if (!Directory.Exists(path))
+        if (!_fileSystem.DirectoryExists(path))
             return;
 
-        await WithRetryAsync(() => Task.Run(() => Directory.Delete(path, recursive)), 
+        await WithRetryAsync(() => Task.Run(() => _fileSystem.DeleteDirectory(path, recursive)), 
             $"Delete folder {path}{(recursive ? " recursively" : "")}");
     }
 
@@ -54,14 +67,13 @@ public class FolderOperator(IFileOperator fileOperator, ILogger logger, int retr
         Validate(sourcePath, destPath, nameof(MoveFolderAsync), overwrite);
 
         string? destParent = Path.GetDirectoryName(destPath);
-        if (!string.IsNullOrEmpty(destParent) && !Directory.Exists(destParent))
-            await WithRetryAsync(() => Task.Run(() => Directory.CreateDirectory(destParent)), 
-                $"Create parent directory {destParent}");
+        if (!string.IsNullOrEmpty(destParent) && !_fileSystem.DirectoryExists(destParent))
+            _fileSystem.CreateDirectory(destParent);
 
-        if (Directory.Exists(destPath) && overwrite)
+        if (_fileSystem.DirectoryExists(destPath) && overwrite)
             await DeleteFolderAsync(destPath, recursive: true);
 
-        await WithRetryAsync(() => Task.Run(() => Directory.Move(sourcePath, destPath)), 
+        await WithRetryAsync(() => Task.Run(() => _fileSystem.MoveDirectory(sourcePath, destPath)), 
             $"Move folder from {sourcePath} to {destPath}");
     }
 
@@ -70,21 +82,21 @@ public class FolderOperator(IFileOperator fileOperator, ILogger logger, int retr
         ValidatePath(path, nameof(RenameFolderAsync));
         if (string.IsNullOrEmpty(newName))
             throw new ArgumentException("New name cannot be null or empty.", nameof(newName));
-        if (!Directory.Exists(path))
+        if (!_fileSystem.DirectoryExists(path))
             throw new DirectoryNotFoundException($"Folder not found: {path}");
 
         string newPath = Path.IsPathFullyQualified(newName) 
             ? newName 
             : Path.Combine(Path.GetDirectoryName(path) ?? "", newName);
 
-        CreateDirectoryIfNotExist(newPath);
+        _fileSystem.CreateDirectoryIfNotExist(newPath);
 
-        if (Directory.Exists(newPath) && !overwrite)
+        if (_fileSystem.DirectoryExists(newPath) && !overwrite)
             throw new IOException($"Folder already exists at {newPath}");
-        if (Directory.Exists(newPath) && overwrite)
+        if (_fileSystem.DirectoryExists(newPath) && overwrite)
             await DeleteFolderAsync(newPath, recursive: true);
 
-        await WithRetryAsync(() => Task.Run(() => Directory.Move(path, newPath)), 
+        await WithRetryAsync(() => Task.Run(() => _fileSystem.MoveDirectory(path, newPath)), 
             $"Rename folder from {path} to {newPath}");
     }
 }

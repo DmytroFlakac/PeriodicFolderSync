@@ -27,8 +27,6 @@
     <ItemGroup>
       <Folder Include="E2ETests\" />
       <Folder Include="IntegrationTests\" />
-      <Folder Include="TestData\replica\" />
-      <Folder Include="TestData\source\" />
     </ItemGroup>
 
     <ItemGroup>
