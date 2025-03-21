@@ -80,6 +80,9 @@ public class FileOperator(ILogger logger, int retryCount = 3, TimeSpan? retryDel
         if (File.Exists(newPath) && overwrite)
             await DeleteFileAsync(newPath);
 
-        await WithRetryAsync(() => Task.Run(() => File.Move(path, newPath)), $"Rename file from {path} to {newPath}");
+        await WithRetryAsync(() 
+                => Task.Run(() 
+                    => File.Move(path, newPath)), 
+            $"Rename file from {path} to {newPath}");
     }
 }
