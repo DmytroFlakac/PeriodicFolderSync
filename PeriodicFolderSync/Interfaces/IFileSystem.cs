@@ -56,6 +56,15 @@ namespace PeriodicFolderSync.Interfaces
         Task CopyFileAsync(string sourcePath, string destPath, bool overwrite = false);
 
         /// <summary>
+        /// Asynchronously copies a folder to a new location.
+        /// </summary>
+        /// <param name="sourcePath">The source file path.</param>
+        /// <param name="destPath">The destination file path.</param>
+        /// <param name="overwrite">True to overwrite if the destination file already exists; otherwise, false.</param>
+        /// <returns>A task that represents the asynchronous copy operation.</returns>
+        Task CopyFolderAsync(string sourcePath, string destPath, bool overwrite = false);
+
+        /// <summary>
         /// Asynchronously deletes the specified file.
         /// </summary>
         /// <param name="path">The file path to delete.</param>
@@ -70,13 +79,7 @@ namespace PeriodicFolderSync.Interfaces
         /// <param name="overwrite">True to overwrite if the destination file already exists; otherwise, false.</param>
         /// <returns>A task that represents the asynchronous move operation.</returns>
         Task MoveFileAsync(string sourcePath, string destPath, bool overwrite = false);
-
-        /// <summary>
-        /// Gets the size of the specified file.
-        /// </summary>
-        /// <param name="path">The file path.</param>
-        /// <returns>The size of the file in bytes.</returns>
-        long GetFileSize(string path);
+        
         
         // Directory operations
         /// <summary>
@@ -125,5 +128,33 @@ namespace PeriodicFolderSync.Interfaces
         /// <param name="sourcePath">The source directory path.</param>
         /// <param name="destPath">The destination directory path.</param>
         void MoveDirectory(string sourcePath, string destPath);
+        
+        /// <summary>
+        /// Gets file information for the specified file.
+        /// </summary>
+        /// <param name="path">The file path.</param>
+        /// <returns>A FileInfo object containing information about the file.</returns>
+        FileInfo GetFileInfo(string path);
+        
+        /// <summary>
+        /// Gets directory information for the specified directory.
+        /// </summary>
+        /// <param name="path">The directory path.</param>
+        /// <returns>A DirectoryInfo object containing information about the directory.</returns>
+        DirectoryInfo GetDirectoryInfo(string path);
+        
+        /// <summary>
+        /// Gets all directories within the specified directory.
+        /// </summary>
+        /// <param name="path">The directory path to search.</param>
+        /// <returns>An array of DirectoryInfo objects.</returns>
+        DirectoryInfo[] GetDirectories(DirectoryInfo directory);
+        
+        /// <summary>
+        /// Gets all files within the specified directory.
+        /// </summary>
+        /// <param name="directory">The DirectoryInfo object representing the directory to search.</param>
+        /// <returns>An array of FileInfo objects.</returns>
+        FileInfo[] GetFiles(DirectoryInfo directory);
     }
 }

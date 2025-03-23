@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using PeriodicFolderSync.Interfaces;
 
 namespace PeriodicFolderSync.Core
@@ -16,9 +17,56 @@ namespace PeriodicFolderSync.Core
 
         public async Task CopyFileAsync(string sourcePath, string destPath, bool overwrite = false)
         {
-            await using var sourceStream = new FileStream(sourcePath, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, true);
-            await using var destStream = new FileStream(destPath, FileMode.Create, FileAccess.Write, FileShare.None, 4096, true);
-            await sourceStream.CopyToAsync(destStream);
+            if (string.IsNullOrEmpty(sourcePath))
+                throw new ArgumentNullException(nameof(sourcePath));
+            if (string.IsNullOrEmpty(destPath))
+                throw new ArgumentNullException(nameof(destPath));
+            if (!File.Exists(sourcePath))
+                throw new FileNotFoundException("Source file not found.", sourcePath);
+            if (File.Exists(destPath) && !overwrite)
+                throw new IOException($"Destination file already exists: {destPath}");
+
+            await using (var sourceStream = new FileStream(sourcePath, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, true))
+            await using (var destStream = new FileStream(destPath, FileMode.Create, FileAccess.Write, FileShare.None, 4096, true))
+            {
+                await sourceStream.CopyToAsync(destStream);
+            }
+
+            try
+            {
+                File.SetLastWriteTime(destPath, File.GetLastWriteTime(sourcePath));
+
+                File.SetLastAccessTime(destPath, File.GetLastAccessTime(sourcePath));
+
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows) || IsCreationTimeSupported(sourcePath))
+                {
+                    File.SetCreationTime(destPath, File.GetCreationTime(sourcePath));
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new IOException($"Failed to copy file attributes from {sourcePath} to {destPath}: {ex.Message}", ex);
+            }
+
+            try
+            {
+                var sourceAttributes = File.GetAttributes(sourcePath);
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                {
+                    File.SetAttributes(destPath, sourceAttributes);
+                }
+                else
+                {
+                    if ((sourceAttributes & FileAttributes.ReadOnly) == FileAttributes.ReadOnly)
+                    {
+                        File.SetAttributes(destPath, FileAttributes.ReadOnly);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new IOException($"Failed to copy file attributes from {sourcePath} to {destPath}: {ex.Message}", ex);
+            }
         }
 
         public async Task DeleteFileAsync(string path)
@@ -31,7 +79,7 @@ namespace PeriodicFolderSync.Core
             await Task.Run(() => File.Move(sourcePath, destPath));
         }
 
-        public long GetFileSize(string path) => new FileInfo(path).Length;
+        public FileInfo GetFileInfo(string path) => new FileInfo(path);
         public bool DirectoryExists(string path) => Directory.Exists(path);
 
         public void CreateDirectory(string path) => Directory.CreateDirectory(path);
@@ -50,5 +98,82 @@ namespace PeriodicFolderSync.Core
         public void DeleteDirectory(string path, bool recursive) => Directory.Delete(path, recursive);
 
         public void MoveDirectory(string sourcePath, string destPath) => Directory.Move(sourcePath, destPath);
+        
+        public DirectoryInfo GetDirectoryInfo(string path) => new DirectoryInfo(path);
+        
+        public DirectoryInfo[] GetDirectories(DirectoryInfo directory) => directory.GetDirectories();
+        
+        public FileInfo[] GetFiles(DirectoryInfo directory) => directory.GetFiles();
+        
+        public async Task CopyFolderAsync(string sourcePath, string destPath, bool overwrite = false)
+        {
+            if (string.IsNullOrEmpty(sourcePath))
+                throw new ArgumentNullException(nameof(sourcePath));
+            if (string.IsNullOrEmpty(destPath))
+                throw new ArgumentNullException(nameof(destPath));
+            if (!Directory.Exists(sourcePath))
+                throw new DirectoryNotFoundException($"Source directory not found: {sourcePath}");
+            
+            if (!Directory.Exists(destPath))
+            {
+                Directory.CreateDirectory(destPath);
+            }
+            else if (!overwrite)
+            {
+                throw new IOException($"Destination directory already exists: {destPath}");
+            }
+            
+            foreach (var file in Directory.GetFiles(sourcePath))
+            {
+                string fileName = Path.GetFileName(file);
+                string destFile = Path.Combine(destPath, fileName);
+                await CopyFileAsync(file, destFile, overwrite);
+            }
+            
+            foreach (var dir in Directory.GetDirectories(sourcePath))
+            {
+                string dirName = Path.GetFileName(dir);
+                string destDir = Path.Combine(destPath, dirName);
+                await CopyFolderAsync(dir, destDir, overwrite);
+            }
+            
+            try
+            {
+                Directory.SetLastWriteTime(destPath, Directory.GetLastWriteTime(sourcePath));
+                Directory.SetLastAccessTime(destPath, Directory.GetLastAccessTime(sourcePath));
+                
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows) || IsCreationTimeSupported(sourcePath))
+                {
+                    Directory.SetCreationTime(destPath, Directory.GetCreationTime(sourcePath));
+                }
+                
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                {
+                    File.SetAttributes(destPath, File.GetAttributes(sourcePath));
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new IOException($"Failed to copy directory attributes from {sourcePath} to {destPath}: {ex.Message}", ex);
+            }
+        }
+
+        private bool IsCreationTimeSupported(string path)
+        {
+            if (Directory.Exists(path))
+            {
+                var creationTime = Directory.GetCreationTime(path);
+                var lastWriteTime = Directory.GetLastWriteTime(path);
+                return creationTime != lastWriteTime;
+            }
+            else if (File.Exists(path))
+            {
+                var creationTime = File.GetCreationTime(path);
+                var lastWriteTime = File.GetLastWriteTime(path);
+                return creationTime != lastWriteTime;
+            }
+            
+            return false;
+        }
     }
 }

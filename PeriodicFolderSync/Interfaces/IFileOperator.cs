@@ -34,15 +34,4 @@ public interface IFileOperator
     /// <exception cref="System.IO.IOException">Thrown when the destination file exists and overwrite is false.</exception>
     Task MoveFileAsync(string sourcePath, string destPath, bool overwrite = false);
     
-    /// <summary>
-    /// Asynchronously renames a file at the specified path.
-    /// </summary>
-    /// <param name="path">The path of the file to rename.</param>
-    /// <param name="newName">The new name for the file. Can be a relative name or a fully qualified path.</param>
-    /// <param name="overwrite">If true, overwrites the destination file if it exists; otherwise, throws an exception.</param>
-    /// <returns>A task representing the asynchronous operation.</returns>
-    /// <exception cref="System.ArgumentException">Thrown when newName is null or empty.</exception>
-    /// <exception cref="System.IO.FileNotFoundException">Thrown when the file to rename does not exist.</exception>
-    /// <exception cref="System.IO.IOException">Thrown when a file with the new name exists and overwrite is false.</exception>
-    Task RenameFileAsync(string path, string newName, bool overwrite = false);
 }

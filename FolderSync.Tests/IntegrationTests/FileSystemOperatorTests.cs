@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using PeriodicFolderSync.Core;
 using System.Text;
+using PeriodicFolderSync.Interfaces;
 
 namespace FolderSync.Tests.IntegrationTests
 {
@@ -10,8 +11,8 @@ namespace FolderSync.Tests.IntegrationTests
         private readonly string _testDirectory;
         private readonly string _sourceDirectory;
         private readonly string _destinationDirectory;
+        
         private readonly FileSystemOperator _fileSystemOperator;
-        private readonly ILogger _logger;
 
         public FileSystemOperatorTests()
         {
@@ -22,8 +23,10 @@ namespace FolderSync.Tests.IntegrationTests
             Directory.CreateDirectory(_sourceDirectory);
             Directory.CreateDirectory(_destinationDirectory);
 
-            _logger = NullLogger.Instance;
-            _fileSystemOperator = new FileSystemOperator(_logger);
+            ILogger<FileSystemOperator> logger = new NullLogger<FileSystemOperator>();
+            IFileComparer fileComparer = new FileComparer(new NullLogger<IFileComparer>());
+            IFileSystem fileSystem = new FileSystem();
+            _fileSystemOperator = new FileSystemOperator(logger, fileSystem, fileComparer);
         }
 
         public void Dispose()
@@ -106,7 +109,12 @@ namespace FolderSync.Tests.IntegrationTests
             await _fileSystemOperator.CopyFileAsync(sourceFile, destFile, true);
 
             Assert.True(File.Exists(destFile));
-            Assert.Equal("New content", await File.ReadAllTextAsync(destFile));
+            
+            var sourceContent = await File.ReadAllTextAsync(sourceFile);
+            var destContent = await File.ReadAllTextAsync(destFile);
+            
+            
+            Assert.Equal(sourceContent, destContent);
         }
 
         [Fact]
@@ -130,20 +138,6 @@ namespace FolderSync.Tests.IntegrationTests
             Assert.False(File.Exists(sourceFile));
             Assert.True(File.Exists(destFile));
             Assert.Equal("Move content", await File.ReadAllTextAsync(destFile));
-        }
-
-        [Fact]
-        public async Task RenameFileAsync_ShouldRenameFile_WhenNewNameDoesNotExist()
-        {
-            string sourceFile = CreateTestFile(_sourceDirectory, "original.txt", "Rename content");
-            string newName = "renamed.txt";
-            string expectedPath = Path.Combine(_sourceDirectory, newName);
-
-            await _fileSystemOperator.RenameFileAsync(sourceFile, newName);
-
-            Assert.False(File.Exists(sourceFile));
-            Assert.True(File.Exists(expectedPath));
-            Assert.Equal("Rename content", await File.ReadAllTextAsync(expectedPath));
         }
 
         [Fact]
@@ -194,23 +188,6 @@ namespace FolderSync.Tests.IntegrationTests
         }
 
         [Fact]
-        public async Task RenameFolderAsync_ShouldRenameFolder_WhenNewNameDoesNotExist()
-        {
-            string dirToRename = CreateTestDirectory(_sourceDirectory, "ToRename");
-            CreateTestFile(dirToRename, "file.txt", "Content");
-
-            string newName = "Renamed";
-            string expectedPath = Path.Combine(_sourceDirectory, newName);
-
-            await _fileSystemOperator.RenameFolderAsync(dirToRename, newName);
-
-            Assert.False(Directory.Exists(dirToRename));
-            Assert.True(Directory.Exists(expectedPath));
-            Assert.True(File.Exists(Path.Combine(expectedPath, "file.txt")));
-            Assert.Equal("Content", await File.ReadAllTextAsync(Path.Combine(expectedPath, "file.txt")));
-        }
-
-        [Fact]
         public async Task CopyFolderAsync_ShouldNotCopySubdirectories_WhenRecursiveIsFalse()
         {
             string sourceSubDir = CreateTestDirectory(_sourceDirectory, "SubDir");
@@ -253,14 +230,11 @@ namespace FolderSync.Tests.IntegrationTests
             string filePath = CreateTestFile(_sourceDirectory, "locked.txt", "Locked content");
             string destPath = Path.Combine(_destinationDirectory, "locked_copy.txt");
 
-            using (FileStream fs = new FileStream(filePath, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
-            {
+            await using FileStream fs = new FileStream(filePath, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+            await Assert.ThrowsAsync<IOException>(() =>
+                _fileSystemOperator.CopyFileAsync(filePath, destPath));
                 
-                var exception = await Assert.ThrowsAsync<IOException>(() =>
-                    _fileSystemOperator.CopyFileAsync(filePath, destPath));
-                
-                Assert.False(File.Exists(destPath));
-            }
+            Assert.False(File.Exists(destPath));
         }
 
         [Fact]

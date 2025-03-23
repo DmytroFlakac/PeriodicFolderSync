@@ -37,15 +37,5 @@ public interface IFolderOperator
     /// <exception cref="System.IO.IOException">Thrown when the destination folder exists and overwrite is false.</exception>
     Task MoveFolderAsync(string sourcePath, string destPath, bool overwrite = false);
     
-    /// <summary>
-    /// Asynchronously renames a folder at the specified path.
-    /// </summary>
-    /// <param name="path">The path of the folder to rename.</param>
-    /// <param name="newName">The new name for the folder. Can be a relative name or a fully qualified path.</param>
-    /// <param name="overwrite">If true, overwrites the destination folder if it exists; otherwise, throws an exception.</param>
-    /// <returns>A task representing the asynchronous operation.</returns>
-    /// <exception cref="System.ArgumentException">Thrown when newName is null or empty.</exception>
-    /// <exception cref="System.IO.DirectoryNotFoundException">Thrown when the folder to rename does not exist.</exception>
-    /// <exception cref="System.IO.IOException">Thrown when a folder with the new name exists and overwrite is false.</exception>
-    Task RenameFolderAsync(string path, string newName, bool overwrite = false);
+    
 }

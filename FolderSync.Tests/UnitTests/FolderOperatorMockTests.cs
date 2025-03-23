@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using Moq;
 using PeriodicFolderSync.Core;
 using FolderSync.Tests.Mocks;
+using PeriodicFolderSync.Interfaces;
 
 namespace FolderSync.Tests.UnitTests
 {
@@ -25,8 +26,12 @@ namespace FolderSync.Tests.UnitTests
             _mockFileSystem.CreateDirectory(_destinationDirectory);
 
             Mock<ILogger> loggerMock = new();
-            _fileOperator = new FileOperator(loggerMock.Object, _mockFileSystem);
-            _folderOperator = new FolderOperator(_fileOperator, loggerMock.Object, _mockFileSystem);
+            Mock<IFileComparer> fileComparerMock = new();
+            fileComparerMock.Setup(fc => fc.AreFilesIdenticalAsync(It.IsAny<string>(), It.IsAny<string>()))
+                .Returns<string, string>(async (file1, file2) => await CompareFiles(file1, file2));
+            
+            _fileOperator = new FileOperator((ILogger<IFileOperator>)loggerMock.Object, _mockFileSystem, fileComparerMock.Object);
+            _folderOperator = new FolderOperator((ILogger<IFolderOperator>)loggerMock.Object, _mockFileSystem);
         }
 
         private string CreateTestFile(string directory, string fileName, string content = "Test content")
@@ -78,9 +83,10 @@ namespace FolderSync.Tests.UnitTests
             Assert.True(_mockFileSystem.DirectoryExists(Path.Combine(destDir, "SubDir")));
             Assert.True(_mockFileSystem.FileExists(Path.Combine(destDir, "file1.txt")));
             Assert.True(_mockFileSystem.FileExists(Path.Combine(destDir, "SubDir", "file2.txt")));
-            
+
             Assert.Equal("Content 1", await _mockFileSystem.ReadAllTextAsync(Path.Combine(destDir, "file1.txt")));
-            Assert.Equal("Content 2", await _mockFileSystem.ReadAllTextAsync(Path.Combine(destDir, "SubDir", "file2.txt")));
+            Assert.Equal("Content 2",
+                await _mockFileSystem.ReadAllTextAsync(Path.Combine(destDir, "SubDir", "file2.txt")));
         }
 
         [Fact]
@@ -89,7 +95,7 @@ namespace FolderSync.Tests.UnitTests
             string nonExistentDir = Path.Combine(_sourceDirectory, "NonExistent");
             string destDir = Path.Combine(_destinationDirectory, "CopiedDir");
 
-            await Assert.ThrowsAsync<DirectoryNotFoundException>(() => 
+            await Assert.ThrowsAsync<DirectoryNotFoundException>(() =>
                 _folderOperator.CopyFolderAsync(nonExistentDir, destDir));
         }
 
@@ -98,7 +104,7 @@ namespace FolderSync.Tests.UnitTests
         {
             string destDir = CreateTestDirectory(_destinationDirectory, "ExistingDir");
 
-            await Assert.ThrowsAsync<IOException>(() => 
+            await Assert.ThrowsAsync<IOException>(() =>
                 _folderOperator.CopyFolderAsync(_sourceDirectory, destDir, false));
         }
 
@@ -153,7 +159,7 @@ namespace FolderSync.Tests.UnitTests
             string nonExistentDir = Path.Combine(_sourceDirectory, "NonExistent");
 
             await _folderOperator.DeleteFolderAsync(nonExistentDir);
-            
+
             Assert.False(_mockFileSystem.DirectoryExists(nonExistentDir));
         }
 
@@ -165,7 +171,7 @@ namespace FolderSync.Tests.UnitTests
 
             string destDir = Path.Combine(_destinationDirectory, "MovedDir");
 
-            await _folderOperator.MoveFolderAsync(sourceSubDir, destDir);
+            await _folderOperator.MoveFolderAsync(sourceSubDir, destDir, false);
 
             Assert.False(_mockFileSystem.DirectoryExists(sourceSubDir));
             Assert.True(_mockFileSystem.DirectoryExists(destDir));
@@ -179,8 +185,8 @@ namespace FolderSync.Tests.UnitTests
             string nonExistentDir = Path.Combine(_sourceDirectory, "NonExistent");
             string destDir = Path.Combine(_destinationDirectory, "MovedDir");
 
-            await Assert.ThrowsAsync<DirectoryNotFoundException>(() => 
-                _folderOperator.MoveFolderAsync(nonExistentDir, destDir));
+            await Assert.ThrowsAsync<DirectoryNotFoundException>(() =>
+                _folderOperator.MoveFolderAsync(nonExistentDir, destDir , false));
         }
 
         [Fact]
@@ -189,7 +195,7 @@ namespace FolderSync.Tests.UnitTests
             string sourceDir = CreateTestDirectory(_sourceDirectory, "ToMove");
             string destDir = CreateTestDirectory(_destinationDirectory, "ExistingDir");
 
-            await Assert.ThrowsAsync<IOException>(() => 
+            await Assert.ThrowsAsync<IOException>(() =>
                 _folderOperator.MoveFolderAsync(sourceDir, destDir, false));
         }
 
@@ -221,94 +227,13 @@ namespace FolderSync.Tests.UnitTests
             string destParent = Path.Combine(_destinationDirectory, "NewParent");
             string destDir = Path.Combine(destParent, "MovedDir");
 
-            await _folderOperator.MoveFolderAsync(sourceDir, destDir);
+            await _folderOperator.MoveFolderAsync(sourceDir, destDir, false);
 
             Assert.False(_mockFileSystem.DirectoryExists(sourceDir));
             Assert.True(_mockFileSystem.DirectoryExists(destParent));
             Assert.True(_mockFileSystem.DirectoryExists(destDir));
             Assert.True(_mockFileSystem.FileExists(Path.Combine(destDir, "file.txt")));
             Assert.Equal("Content", await _mockFileSystem.ReadAllTextAsync(Path.Combine(destDir, "file.txt")));
-        }
-
-        [Fact]
-        public async Task RenameFolderAsync_ShouldRenameFolder_WhenNewNameDoesNotExist()
-        {
-            string dirToRename = CreateTestDirectory(_sourceDirectory, "ToRename");
-            CreateTestFile(dirToRename, "file.txt", "Content");
-
-            string newName = "Renamed";
-            string expectedPath = Path.Combine(_sourceDirectory, newName);
-
-            await _folderOperator.RenameFolderAsync(dirToRename, newName);
-
-            Assert.False(_mockFileSystem.DirectoryExists(dirToRename));
-            Assert.True(_mockFileSystem.DirectoryExists(expectedPath));
-            Assert.True(_mockFileSystem.FileExists(Path.Combine(expectedPath, "file.txt")));
-            Assert.Equal("Content", await _mockFileSystem.ReadAllTextAsync(Path.Combine(expectedPath, "file.txt")));
-        }
-
-        [Fact]
-        public async Task RenameFolderAsync_ShouldAcceptFullPath_WhenNewNameIsFullyQualified()
-        {
-            string dirToRename = CreateTestDirectory(_sourceDirectory, "ToRename");
-            CreateTestFile(dirToRename, "file.txt", "Content");
-
-            string newPath = Path.Combine(_destinationDirectory, "Renamed");
-
-            await _folderOperator.RenameFolderAsync(dirToRename, newPath);
-
-            Assert.False(_mockFileSystem.DirectoryExists(dirToRename));
-            Assert.True(_mockFileSystem.DirectoryExists(newPath));
-            Assert.True(_mockFileSystem.FileExists(Path.Combine(newPath, "file.txt")));
-            Assert.Equal("Content", await _mockFileSystem.ReadAllTextAsync(Path.Combine(newPath, "file.txt")));
-        }
-
-        [Fact]
-        public async Task RenameFolderAsync_ShouldThrowException_WhenFolderDoesNotExist()
-        {
-            string nonExistentDir = Path.Combine(_sourceDirectory, "NonExistent");
-            string newName = "Renamed";
-
-            await Assert.ThrowsAsync<DirectoryNotFoundException>(() => 
-                _folderOperator.RenameFolderAsync(nonExistentDir, newName));
-        }
-
-        [Fact]
-        public async Task RenameFolderAsync_ShouldThrowException_WhenNewNameIsEmpty()
-        {
-            string dirToRename = CreateTestDirectory(_sourceDirectory, "ToRename");
-            string newName = "";
-
-            await Assert.ThrowsAsync<ArgumentException>(() => 
-                _folderOperator.RenameFolderAsync(dirToRename, newName));
-        }
-
-        [Fact]
-        public async Task RenameFolderAsync_ShouldThrowException_WhenNewNameExists()
-        {
-            string dirToRename = CreateTestDirectory(_sourceDirectory, "ToRename");
-            string existingDir = CreateTestDirectory(_sourceDirectory, "Existing");
-            
-            await Assert.ThrowsAsync<IOException>(() => 
-                _folderOperator.RenameFolderAsync(dirToRename, "Existing", false));
-        }
-
-        [Fact]
-        public async Task RenameFolderAsync_ShouldOverwriteDestination_WhenOverwriteIsTrue()
-        {
-            string dirToRename = CreateTestDirectory(_sourceDirectory, "ToRename");
-            CreateTestFile(dirToRename, "file.txt", "New content");
-
-            string existingName = "Existing";
-            string existingDir = CreateTestDirectory(_sourceDirectory, existingName);
-            CreateTestFile(existingDir, "file.txt", "Old content");
-
-            await _folderOperator.RenameFolderAsync(dirToRename, existingName, true);
-
-            Assert.False(_mockFileSystem.DirectoryExists(dirToRename));
-            Assert.True(_mockFileSystem.DirectoryExists(existingDir));
-            Assert.True(_mockFileSystem.FileExists(Path.Combine(existingDir, "file.txt")));
-            Assert.Equal("New content", await _mockFileSystem.ReadAllTextAsync(Path.Combine(existingDir, "file.txt")));
         }
 
         [Fact]
@@ -321,10 +246,11 @@ namespace FolderSync.Tests.UnitTests
 
             var files = _mockFileSystem.GetFiles(_sourceDirectory);
 
-            Assert.Equal(2, files.Count());
-            Assert.Contains(file1, files);
-            Assert.Contains(file2, files);
-            Assert.DoesNotContain(file3, files);
+            var enumerable = files as string[] ?? files.ToArray();
+            Assert.Equal(2, enumerable.Count());
+            Assert.Contains(file1, enumerable);
+            Assert.Contains(file2, enumerable);
+            Assert.DoesNotContain(file3, enumerable);
         }
 
         [Fact]
@@ -342,7 +268,7 @@ namespace FolderSync.Tests.UnitTests
         {
             string nonExistentDir = Path.Combine(_sourceDirectory, "NonExistent");
 
-            Assert.Throws<DirectoryNotFoundException>(() => 
+            Assert.Throws<DirectoryNotFoundException>(() =>
                 _mockFileSystem.GetFiles(nonExistentDir));
         }
 
@@ -355,10 +281,11 @@ namespace FolderSync.Tests.UnitTests
 
             var directories = _mockFileSystem.GetDirectories(_sourceDirectory);
 
-            Assert.Equal(2, directories.Count());
-            Assert.Contains(subDir1, directories);
-            Assert.Contains(subDir2, directories);
-            Assert.DoesNotContain(nestedDir, directories);
+            var enumerable = directories as string[] ?? directories.ToArray();
+            Assert.Equal(2, enumerable.Count());
+            Assert.Contains(subDir1, enumerable);
+            Assert.Contains(subDir2, enumerable);
+            Assert.DoesNotContain(nestedDir, enumerable);
         }
 
         [Fact]
@@ -376,7 +303,7 @@ namespace FolderSync.Tests.UnitTests
         {
             string nonExistentDir = Path.Combine(_sourceDirectory, "NonExistent");
 
-            Assert.Throws<DirectoryNotFoundException>(() => 
+            Assert.Throws<DirectoryNotFoundException>(() =>
                 _mockFileSystem.GetDirectories(nonExistentDir));
         }
 
@@ -402,20 +329,92 @@ namespace FolderSync.Tests.UnitTests
         public void FileExists_ShouldReturnTrue_WhenFileExists()
         {
             string filePath = CreateTestFile(_sourceDirectory, "testFile.txt");
-            
+
             bool exists = _mockFileSystem.FileExists(filePath);
-            
+
             Assert.True(exists);
         }
-        
+
         [Fact]
         public void FileExists_ShouldReturnFalse_WhenFileDoesNotExist()
         {
             string nonExistentFile = Path.Combine(_sourceDirectory, "nonExistent.txt");
-            
+
             bool exists = _mockFileSystem.FileExists(nonExistentFile);
-            
+
             Assert.False(exists);
+        }
+
+        [Fact]
+        public async Task CopyFolderAsync_ShouldSkipUnchangedFiles_WhenFilesAreIdentical()
+        {
+            string sourceFile = CreateTestFile(_sourceDirectory, "unchanged.txt", "Test content");
+            string destDir = Path.Combine(_destinationDirectory, "DestDir");
+            _mockFileSystem.CreateDirectory(destDir);
+            string destFile = Path.Combine(destDir, "unchanged.txt");
+
+            await _mockFileSystem.WriteAllTextAsync(destFile, "Test content");
+
+            var now = DateTime.Now;
+            _mockFileSystem.SetLastWriteTimeUtc(sourceFile, now);
+            _mockFileSystem.SetLastWriteTimeUtc(destFile, now);
+            
+            await _folderOperator.CopyFolderAsync(_sourceDirectory, destDir, overwrite: true);
+            
+            var sourceBytes = await _mockFileSystem.ReadAllBytesAsync(sourceFile);
+            var destBytes = await _mockFileSystem.ReadAllBytesAsync(destFile);
+            System.Diagnostics.Debug.WriteLine($"Source file size: {sourceBytes.Length}, content: {System.Text.Encoding.UTF8.GetString(sourceBytes)}");
+            System.Diagnostics.Debug.WriteLine($"Dest file size: {destBytes.Length}, content: {System.Text.Encoding.UTF8.GetString(destBytes)}");
+            
+            var sourceInfo = _mockFileSystem.GetFileInfo(sourceFile);
+            var destInfo = _mockFileSystem.GetFileInfo(destFile);
+            
+            Assert.True(await CompareFiles(sourceFile, destFile));
+            Assert.Equal(sourceInfo.LastWriteTime, destInfo.LastWriteTime);
+        }
+
+        [Fact]
+        public async Task CopyFolderAsync_ShouldCopyChangedFiles_WhenContentDiffers()
+        {
+            string sourceFile = CreateTestFile(_sourceDirectory, "changed.txt", "New content");
+            string destDir = Path.Combine(_destinationDirectory, "DestDir");
+            _mockFileSystem.CreateDirectory(destDir);
+            string destFile = Path.Combine(destDir, "changed.txt");
+
+            await _mockFileSystem.WriteAllTextAsync(destFile, "Old content");
+
+            var originalDestContent = await _mockFileSystem.ReadAllTextAsync(destFile);
+            Assert.Equal("Old content", originalDestContent);
+
+            await _folderOperator.CopyFolderAsync(_sourceDirectory, destDir, overwrite: true);
+
+            var newDestContent = await _mockFileSystem.ReadAllTextAsync(destFile);
+            Assert.Equal("New content", newDestContent);
+            Assert.True(await CompareFiles(sourceFile, destFile));
+        }
+
+        [Fact]
+        public async Task CopyFolderAsync_ShouldCopyChangedFiles_WhenSizeDiffers()
+        {
+            string sourceFile = CreateTestFile(_sourceDirectory, "size_diff.txt", "Longer content with more text");
+            string destDir = Path.Combine(_destinationDirectory, "DestDir");
+            _mockFileSystem.CreateDirectory(destDir);
+            string destFile = Path.Combine(destDir, "size_diff.txt");
+
+            await _mockFileSystem.WriteAllTextAsync(destFile, "Short");
+
+            var sourceInfo = _mockFileSystem.GetFileInfo(sourceFile);
+            var destInfo = _mockFileSystem.GetFileInfo(destFile);
+            
+            byte[] sourceBytes = await _mockFileSystem.ReadAllBytesAsync(sourceFile);
+            byte[] destBytes = await _mockFileSystem.ReadAllBytesAsync(destFile);
+            Assert.NotEqual(sourceBytes.Length, destBytes.Length);
+
+            await _folderOperator.CopyFolderAsync(_sourceDirectory, destDir, overwrite: true);
+
+            Assert.True(await CompareFiles(sourceFile, destFile));
+            var newDestInfo = _mockFileSystem.GetFileInfo(destFile);
+            Assert.Equal(sourceInfo.Length, newDestInfo.Length);
         }
     }
 }

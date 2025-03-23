@@ -2,12 +2,12 @@ using Microsoft.Extensions.Logging;
 using Moq;
 using PeriodicFolderSync.Core;
 using FolderSync.Tests.Mocks;
+using PeriodicFolderSync.Interfaces;
 
 namespace FolderSync.Tests.UnitTests
 {
     public class FileOperatorMockTests
     {
-        private readonly string _testDirectory;
         private readonly string _sourceDirectory;
         private readonly string _destinationDirectory;
         private readonly FileOperator _fileOperator;
@@ -15,16 +15,20 @@ namespace FolderSync.Tests.UnitTests
 
         public FileOperatorMockTests()
         {
-            _testDirectory = @"D:\TestDirectory";
-            _sourceDirectory = Path.Combine(_testDirectory, "Source");
-            _destinationDirectory = Path.Combine(_testDirectory, "Destination");
+            var testDirectory = @"D:\TestDirectory";
+            _sourceDirectory = Path.Combine(testDirectory, "Source");
+            _destinationDirectory = Path.Combine(testDirectory, "Destination");
 
             _mockFileSystem = new MockFileSystem();
             _mockFileSystem.CreateDirectory(_sourceDirectory);
             _mockFileSystem.CreateDirectory(_destinationDirectory);
 
-            Mock<ILogger> loggerMock = new();
-            _fileOperator = new FileOperator(loggerMock.Object, _mockFileSystem);
+            Mock<ILogger<IFileOperator>> loggerMock = new();
+            Mock<IFileComparer> fileComparerMock = new();
+            fileComparerMock.Setup(fc => fc.AreFilesIdenticalAsync(It.IsAny<string>(), It.IsAny<string>()))
+                .Returns<string, string>(async (file1, file2) => await CompareFiles(file1, file2));
+            
+            _fileOperator = new FileOperator(loggerMock.Object, _mockFileSystem, fileComparerMock.Object);
         }
 
         private string CreateTestFile(string directory, string fileName, string content = "Test content")
@@ -166,83 +170,6 @@ namespace FolderSync.Tests.UnitTests
         }
 
         [Fact]
-        public async Task RenameFileAsync_ShouldRenameFile_WhenNewNameDoesNotExist()
-        {
-            string sourceFile = CreateTestFile(_sourceDirectory, "original.txt", "Rename content");
-            string newName = "renamed.txt";
-            string expectedPath = Path.Combine(_sourceDirectory, newName);
-
-            await _fileOperator.RenameFileAsync(sourceFile, newName);
-
-            Assert.False(_mockFileSystem.FileExists(sourceFile));
-            Assert.True(_mockFileSystem.FileExists(expectedPath));
-            Assert.Equal("Rename content", await _mockFileSystem.ReadAllTextAsync(expectedPath));
-        }
-
-        [Fact]
-        public async Task RenameFileAsync_ShouldAcceptFullPath_WhenNewNameIsFullyQualified()
-        {
-            string sourceFile = CreateTestFile(_sourceDirectory, "original.txt", "Rename content");
-            string newPath = Path.Combine(_destinationDirectory, "renamed.txt");
-
-            await _fileOperator.RenameFileAsync(sourceFile, newPath);
-
-            Assert.False(_mockFileSystem.FileExists(sourceFile));
-            Assert.True(_mockFileSystem.FileExists(newPath));
-            Assert.Equal("Rename content", await _mockFileSystem.ReadAllTextAsync(newPath));
-        }
-
-        [Fact]
-        public async Task RenameFileAsync_ShouldThrowException_WhenFileDoesNotExist()
-        {
-            string sourceFile = Path.Combine(_sourceDirectory, "nonexistent.txt");
-            string newName = "renamed.txt";
-
-            await Assert.ThrowsAsync<FileNotFoundException>(() => 
-                _fileOperator.RenameFileAsync(sourceFile, newName));
-        }
-
-        [Fact]
-        public async Task RenameFileAsync_ShouldThrowException_WhenNewNameIsEmpty()
-        {
-            string sourceFile = CreateTestFile(_sourceDirectory, "original.txt");
-            string newName = "";
-
-            await Assert.ThrowsAsync<ArgumentException>(() => 
-                _fileOperator.RenameFileAsync(sourceFile, newName));
-        }
-
-        [Fact]
-        public async Task RenameFileAsync_ShouldOverwriteDestination_WhenOverwriteIsTrue()
-        {
-            string sourceFile = CreateTestFile(_sourceDirectory, "original.txt", "New content");
-            string newName = "renamed.txt";
-            string newPath = Path.Combine(_sourceDirectory, newName);
-            CreateTestFile(_sourceDirectory, newName, "Old content");
-
-            await _fileOperator.RenameFileAsync(sourceFile, newName, true);
-
-            Assert.False(_mockFileSystem.FileExists(sourceFile));
-            Assert.True(_mockFileSystem.FileExists(newPath));
-            Assert.Equal("New content", await _mockFileSystem.ReadAllTextAsync(newPath));
-        }
-
-        [Fact]
-        public async Task RenameFileAsync_ShouldCreateDirectories_WhenNewPathContainsNonExistentDirectories()
-        {
-            string sourceFile = CreateTestFile(_sourceDirectory, "original.txt", "Content");
-            string newDir = Path.Combine(_destinationDirectory, "NewSubDir");
-            string newPath = Path.Combine(newDir, "renamed.txt");
-
-            await _fileOperator.RenameFileAsync(sourceFile, newPath);
-
-            Assert.False(_mockFileSystem.FileExists(sourceFile));
-            Assert.True(_mockFileSystem.DirectoryExists(newDir));
-            Assert.True(_mockFileSystem.FileExists(newPath));
-            Assert.Equal("Content", await _mockFileSystem.ReadAllTextAsync(newPath));
-        }
-
-        [Fact]
         public async Task CopyFileAsync_ShouldHandleLargeFiles()
         {
             string sourceFile = Path.Combine(_sourceDirectory, "large.bin");
@@ -255,7 +182,7 @@ namespace FolderSync.Tests.UnitTests
             await _fileOperator.CopyFileAsync(sourceFile, destFile);
 
             Assert.True(_mockFileSystem.FileExists(destFile));
-            Assert.Equal(_mockFileSystem.GetFileSize(sourceFile), _mockFileSystem.GetFileSize(destFile));
+            Assert.Equal(_mockFileSystem.GetFileInfo(sourceFile).Length, _mockFileSystem.GetFileInfo(destFile).Length);
             Assert.True(await CompareFiles(sourceFile, destFile));
         }
     }
