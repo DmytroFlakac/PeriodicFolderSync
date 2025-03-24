@@ -4,6 +4,10 @@ namespace PeriodicFolderSync.Interfaces
 {
     /// <summary>
     /// Defines methods for determining if folders and files match between source and destination.
+    /// This strategy pattern allows for different matching algorithms to be implemented:
+    /// - Content-based matching (using hashes or byte-by-byte comparison)
+    /// - Metadata-based matching (size, timestamps)
+    /// - Custom matching rules for specific use cases
     /// </summary>
     public interface IMatchStrategy
     {

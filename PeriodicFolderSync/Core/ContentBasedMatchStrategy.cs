@@ -3,15 +3,15 @@ using Microsoft.Extensions.Logging;
 
 namespace PeriodicFolderSync.Core
 {
-    public class ContentBasedMatchStrategy(ILogger<IMatchStrategy> logger) : IMatchStrategy
+    public class ContentBasedMatchStrategy(ILogger<IMatchStrategy> logger, IFileComparer fileComparer) : IMatchStrategy
     {
         private readonly ILogger<IMatchStrategy> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        private readonly IFileComparer _fileComparer = fileComparer ?? throw new ArgumentNullException(nameof(fileComparer));
 
         public Task<bool> IsFolderMatchAsync(string sourceFolder, string destFolder, IFileSystem fileSystem, string source, string destination)
         {
             try
             {
-                //check if the source and destination folders exist
                 if (!fileSystem.DirectoryExists(sourceFolder) || !fileSystem.DirectoryExists(destFolder))
                 {
                     return Task.FromResult(false);
@@ -62,6 +62,7 @@ namespace PeriodicFolderSync.Core
                     .Select(f => fileSystem.GetFileInfo(f).Length)
                     .OrderBy(s => s)
                     .ToList();
+                
                 int matchCount = sourceSizes.Intersect(destSizes).Count();
                 
                
@@ -89,26 +90,16 @@ namespace PeriodicFolderSync.Core
             }
         }
 
-        public Task<bool> IsFileMatchAsync(string sourceFile, string destFile, IFileSystem fileSystem)
+        public async Task<bool> IsFileMatchAsync(string sourceFile, string destFile, IFileSystem fileSystem)
         {
             try
             {
-                var sourceInfo = fileSystem.GetFileInfo(sourceFile);
-                var destInfo = fileSystem.GetFileInfo(destFile);
-                
-                // Check size first
-                if (sourceInfo.Length != destInfo.Length)
-                    return Task.FromResult(false);
-                    
-                // Check timestamps (exact match as in OldSynchronizer)
-                bool timestampsMatch = sourceInfo.LastWriteTimeUtc == destInfo.LastWriteTimeUtc;
-                
-                return Task.FromResult(timestampsMatch);
+                return await _fileComparer.AreFilesIdenticalAsync(sourceFile, destFile);
             }
             catch (Exception ex)
             {
                 _logger.LogWarning($"Error during file matching: {ex.Message}");
-                return Task.FromResult(false);
+                return false;
             }
         }
     }

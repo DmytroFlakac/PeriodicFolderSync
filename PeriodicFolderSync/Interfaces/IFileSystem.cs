@@ -6,6 +6,10 @@ namespace PeriodicFolderSync.Interfaces
 {
     /// <summary>
     /// Interface for file system operations to enable testability and abstraction from the physical file system.
+    /// This interface serves as the primary abstraction over file system operations, allowing for:
+    /// - Mocking in unit tests
+    /// - Potential implementation for different storage systems (local, cloud, etc.)
+    /// - Centralized error handling for file operations
     /// </summary>
     public interface IFileSystem
     {
@@ -156,5 +160,21 @@ namespace PeriodicFolderSync.Interfaces
         /// <param name="directory">The DirectoryInfo object representing the directory to search.</param>
         /// <returns>An array of FileInfo objects.</returns>
         FileInfo[] GetFiles(DirectoryInfo directory);
+
+        // Add this method to the interface
+        /// <summary>
+        /// Gets all files in a directory and its subdirectories recursively.
+        /// </summary>
+        /// <param name="path">The directory path to search.</param>
+        /// <returns>A HashSet containing all file paths.</returns>
+        HashSet<string> GetAllFiles(string path);
+
+        // Add this method to the interface
+        /// <summary>
+        /// Gets all folders in a directory and its subdirectories recursively.
+        /// </summary>
+        /// <param name="path">The directory path to search.</param>
+        /// <returns>A HashSet containing all folder paths.</returns>
+        HashSet<string> GetAllFolders(string path);
     }
 }

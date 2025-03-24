@@ -50,7 +50,6 @@ namespace PeriodicFolderSync.Core
             try
             {
                 using var md5 = MD5.Create();
-                // Use ReadAllBytesAsync from IFileSystem instead of File.OpenRead
                 byte[] fileBytes = await _fileSystem.ReadAllBytesAsync(filePath);
                 byte[] hash = md5.ComputeHash(fileBytes);
                 return BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
@@ -62,6 +61,12 @@ namespace PeriodicFolderSync.Core
             }
         }
 
+        /// <summary>
+        /// Compares the contents of two files byte by byte to determine if they are identical.
+        /// </summary>
+        /// <param name="file1Path">Path to the first file.</param>
+        /// <param name="file2Path">Path to the second file.</param>
+        /// <returns>True if the file contents are identical, false otherwise.</returns>
         private async Task<bool> CompareFileContentsAsync(string file1Path, string file2Path)
         {
             try

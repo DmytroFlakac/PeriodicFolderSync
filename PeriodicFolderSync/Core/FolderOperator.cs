@@ -18,7 +18,7 @@ public class FolderOperator(
             throw new DirectoryNotFoundException($"Source directory not found {sourcePath}");
     }
 
-    public async Task CopyFolderAsync(string sourcePath, string destPath, bool overwrite = false, bool recursive = true)
+    public async Task CopyFolderAsync(string sourcePath, string destPath, bool overwrite = false)
     {
         Validate(sourcePath, destPath, nameof(CopyFolderAsync), overwrite);
 

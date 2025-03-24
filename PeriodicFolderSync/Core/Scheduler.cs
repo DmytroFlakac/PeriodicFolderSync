@@ -1,5 +1,4 @@
-﻿using System.Diagnostics;
-using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.Logging;
 using PeriodicFolderSync.Interfaces;
 
 namespace PeriodicFolderSync.Core
@@ -60,6 +59,10 @@ namespace PeriodicFolderSync.Core
             _useOverwrite = false;
         }
 
+        /// <summary>
+        /// Performs the synchronization operation between source and destination folders.
+        /// </summary>
+        /// <returns>A task representing the asynchronous operation.</returns>
         private async Task SyncFolders()
         {
             lock (_syncLock)

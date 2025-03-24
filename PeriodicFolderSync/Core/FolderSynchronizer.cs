@@ -16,15 +16,11 @@ namespace PeriodicFolderSync.Core
         private readonly IFileSystem _fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
         private readonly IMatchStrategy _matchStrategy = matchStrategy ?? throw new ArgumentNullException(nameof(matchStrategy));
         private readonly ILogger _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        private string _source = string.Empty;
-        private string _destination = string.Empty;
-
+       
         public async Task SynchronizeFoldersAsync(string source, string destination, SyncStatistics stats, bool useOverwrite)
         {
-            _source = source;
-            _destination = destination;
-            var sourceFolders = GetAllFolders(source);
-            var destFolders = GetAllFolders(destination);
+            var sourceFolders = _fileSystem.GetAllFolders(source);
+            var destFolders = _fileSystem.GetAllFolders(destination);
             var processedDestFolders = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var movedFolders = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
@@ -37,6 +33,8 @@ namespace PeriodicFolderSync.Core
                 if (!destExists)
                 {
                     await HandleMissingDestinationFolder(
+                        source,
+                        destination,
                         sourceFolder, 
                         destEquivalent, 
                         destFolders, 
@@ -60,7 +58,22 @@ namespace PeriodicFolderSync.Core
                 stats);
         }
 
+        /// <summary>
+        /// Handles the case when a destination folder is missing by either finding a matching folder to move or creating a new one.
+        /// </summary>
+        /// <param name="source">The source directory path.</param>
+        /// <param name="destination">The destination directory path.</param>
+        /// <param name="sourceFolder">The source folder path.</param>
+        /// <param name="destEquivalent">The destination folder path.</param>
+        /// <param name="destFolders">Set of all destination folders.</param>
+        /// <param name="processedDestFolders">Set of destination folders that have already been processed.</param>
+        /// <param name="movedFolders">Dictionary tracking folders that have been moved.</param>
+        /// <param name="stats">Statistics object to track synchronization metrics.</param>
+        /// <param name="useOverwrite">If true, overwrites existing folders at the destination.</param>
+        /// <returns>A task representing the asynchronous operation.</returns>
         private async Task HandleMissingDestinationFolder(
+            string source,
+            string destination,
             string sourceFolder,
             string destEquivalent,
             HashSet<string> destFolders,
@@ -83,7 +96,7 @@ namespace PeriodicFolderSync.Core
                     
                     try
                     {
-                        if (await _matchStrategy.IsFolderMatchAsync(sourceFolder, destFolder, _fileSystem, _source, _destination))
+                        if (await _matchStrategy.IsFolderMatchAsync(sourceFolder, destFolder, _fileSystem, source, destination))
                         {
                             _logger.LogInformation($"Moving/renaming FOLDER: {destFolder} to {destEquivalent}");
                             
@@ -146,6 +159,17 @@ namespace PeriodicFolderSync.Core
             await CopyFolderAndUpdateTracking(sourceFolder, destEquivalent, destFolders, processedDestFolders, stats, sourceFileInfos, useOverwrite);
         }
 
+        /// <summary>
+        /// Copies a folder from source to destination and updates tracking collections.
+        /// </summary>
+        /// <param name="sourceFolder">The source folder path.</param>
+        /// <param name="destEquivalent">The destination folder path.</param>
+        /// <param name="destFolders">Set of all destination folders.</param>
+        /// <param name="processedDestFolders">Set of destination folders that have already been processed.</param>
+        /// <param name="stats">Statistics object to track synchronization metrics.</param>
+        /// <param name="sourceFileInfos">Array of FileInfo objects for files in the source folder.</param>
+        /// <param name="useOverwrite">If true, overwrites existing folders at the destination.</param>
+        /// <returns>A task representing the asynchronous operation.</returns>
         private async Task CopyFolderAndUpdateTracking(
             string sourceFolder, 
             string destEquivalent, 
@@ -161,7 +185,7 @@ namespace PeriodicFolderSync.Core
             destFolders.Add(destEquivalent);
             processedDestFolders.Add(destEquivalent);
             
-            var newSubfolders = GetAllFolders(destEquivalent);
+            var newSubfolders = _fileSystem.GetDirectories(sourceFolder);
             foreach (var subfolder in newSubfolders)
             {
                 destFolders.Add(subfolder);
@@ -172,6 +196,16 @@ namespace PeriodicFolderSync.Core
             stats.FoldersChangedCount++;
         }
 
+        /// <summary>
+        /// Processes folders in the destination that don't exist in the source, deleting them if necessary.
+        /// </summary>
+        /// <param name="destination">The destination directory path.</param>
+        /// <param name="source">The source directory path.</param>
+        /// <param name="destFolders">Set of all destination folders.</param>
+        /// <param name="processedDestFolders">Set of destination folders that have already been processed.</param>
+        /// <param name="sourceFolders">Set of all source folders.</param>
+        /// <param name="stats">Statistics object to track synchronization metrics.</param>
+        /// <returns>A task representing the asynchronous operation.</returns>
         private async Task ProcessExtraDestinationFolders(
             string destination,
             string source,
@@ -181,43 +215,35 @@ namespace PeriodicFolderSync.Core
             SyncStatistics stats)
         {
             var orderedDestFolders = destFolders.OrderByDescending(f => f.Length).ToList();
-            
+    
+            var deletedFolders = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+    
             foreach (var destFolder in orderedDestFolders)
             {
-                if (processedDestFolders.Contains(destFolder))
+                if (processedDestFolders.Contains(destFolder) || deletedFolders.Contains(destFolder))
                     continue;
 
                 var relativePath = Path.GetRelativePath(destination, destFolder);
                 var sourceEquivalent = Path.Combine(source, relativePath);
-                
+        
                 if (!sourceFolders.Contains(sourceEquivalent))
                 {
-                    var subDirsCount = destFolders
-                        .Count(p => p.StartsWith(destFolder, StringComparison.OrdinalIgnoreCase) && 
-                               !p.Equals(destFolder, StringComparison.OrdinalIgnoreCase));
-                    
+                    var subDirs = destFolders
+                        .Where(p => p.StartsWith(destFolder + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) || 
+                                    p.Equals(destFolder, StringComparison.OrdinalIgnoreCase))
+                        .ToList();
+            
                     _logger.LogInformation($"Deleting extra FOLDER: {destFolder} (not present in source)");
                     await _folderOperator.DeleteFolderAsync(destFolder);
-                    
-                    stats.DeletedFolders += 1 + subDirsCount;
+            
+                    foreach (var subDir in subDirs)
+                    {
+                        deletedFolders.Add(subDir);
+                    }
+            
+                    stats.DeletedFolders++;
                 }
             }
-        }
-
-        private HashSet<string> GetAllFolders(string path)
-        {
-            var folders = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            if (!_fileSystem.DirectoryExists(path)) return folders;
-            
-            var dirInfo = _fileSystem.GetDirectoryInfo(path);
-            var subDirs = _fileSystem.GetDirectories(dirInfo);
-            
-            foreach (var dir in subDirs)
-            {
-                folders.Add(dir.FullName);
-                folders.UnionWith(GetAllFolders(dir.FullName));
-            }
-            return folders;
         }
     }
 }

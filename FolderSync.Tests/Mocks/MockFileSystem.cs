@@ -367,7 +367,26 @@ namespace FolderSync.Tests.Mocks
             // Convert each path to a FileInfo by using our GetFileInfo method
             return filePaths.Select(path => GetFileInfo(path)).ToArray();
         }
+
+        public HashSet<string> GetAllFiles(string path)
+        {
+            var files = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (!DirectoryExists(path)) return files;
+    
+            string normalizedPath = NormalizePath(path);
+            if (!normalizedPath.EndsWith(Path.DirectorySeparatorChar))
+                normalizedPath += Path.DirectorySeparatorChar;
+    
+            // Add files directly in this directory
+            files.UnionWith(GetFiles(path));
+    
+            // Recursively add files from subdirectories
+            foreach (var dir in GetDirectories(path))
+                files.UnionWith(GetAllFiles(dir));
         
+            return files;
+        }
+
         public async Task MoveFolderAsync(string sourcePath, string destPath, bool overwrite = false)
         {
             string normalizedSourcePath = NormalizePath(sourcePath);
@@ -438,5 +457,38 @@ namespace FolderSync.Tests.Mocks
                 throw new IOException($"Failed to copy directory attributes from {sourcePath} to {destPath}: {ex.Message}", ex);
             }
         }
+
+        public HashSet<string> GetAllFolders(string path)
+        {
+            var folders = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (!DirectoryExists(path)) return folders;
+            
+            string normalizedPath = NormalizePath(path);
+            
+            // Add the root folder itself
+            folders.Add(normalizedPath);
+            
+            // Use an iterative approach with a queue
+            var directoriesToProcess = new Queue<string>();
+            directoriesToProcess.Enqueue(normalizedPath);
+            
+            while (directoriesToProcess.Count > 0)
+            {
+                string currentDir = directoriesToProcess.Dequeue();
+                
+                foreach (var dir in GetDirectories(currentDir))
+                {
+                    folders.Add(dir);
+                    directoriesToProcess.Enqueue(dir);
+                }
+            }
+            
+            return folders;
+        }
     }
+
+
+
 }
+
+

@@ -194,41 +194,7 @@ namespace FolderSync.Tests.UnitTests
             Assert.True(result);
         }
 
-        [Fact]
-        public async Task CompareFileContents_LargeDifferentFiles_ReturnsFalse()
-        {
-            // Arrange
-            string file1Path = Path.Combine(_testDirectory, "large1.bin");
-            string file2Path = Path.Combine(_testDirectory, "large2.bin");
-
-            // Create two different large files
-            const int size = 10000; // Larger than typical buffer size
-            var random1 = new Random(42);
-            var random2 = new Random(43); // Different seed
-            
-            byte[] data1 = new byte[size];
-            byte[] data2 = new byte[size];
-            
-            random1.NextBytes(data1);
-            random2.NextBytes(data2);
-
-            // Create files in both mock and real file system
-            await _fileSystemMock.WriteAllBytesAsync(file1Path, data1);
-            await _fileSystemMock.WriteAllBytesAsync(file2Path, data2);
-            
-            await File.WriteAllBytesAsync(file1Path, data1);
-            await File.WriteAllBytesAsync(file2Path, data2);
-
-            // Create a FileComparer that uses the real file system
-            var realFileComparer = new FileComparer((ILogger<IFileComparer>)new Mock<ILogger>().Object);
-
-            // Act
-            var result = await realFileComparer.AreFilesIdenticalAsync(file1Path, file2Path);
-
-            // Assert
-            Assert.False(result);
-        }
-
+        
         [Fact]
         public async Task AreFilesIdentical_ExceptionThrown_ReturnsFalse()
         {

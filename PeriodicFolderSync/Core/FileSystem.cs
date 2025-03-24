@@ -175,5 +175,76 @@ namespace PeriodicFolderSync.Core
             
             return false;
         }
+
+        public HashSet<string> GetAllFiles(string path)
+        {
+            var files = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (!Directory.Exists(path)) return files;
+            
+            var directories = new Stack<string>();
+            directories.Push(path);
+            
+            while (directories.Count > 0)
+            {
+                string currentDir = directories.Pop();
+                
+                try
+                {
+                    files.UnionWith(Directory.EnumerateFiles(currentDir));
+                    
+                    foreach (var dir in Directory.EnumerateDirectories(currentDir))
+                    {
+                        directories.Push(dir);
+                    }
+                }
+                catch (UnauthorizedAccessException ex)
+                {
+                    throw new UnauthorizedAccessException($"Access to directory {currentDir} is denied: {ex.Message}", ex);
+                }
+                catch (IOException ex)
+                {
+                    throw new IOException($"Error accessing directory {currentDir}: {ex.Message}", ex);
+                }
+            }
+            
+            return files;
+        }
+
+        public HashSet<string> GetAllFolders(string path)
+        {
+            var folders = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (!Directory.Exists(path)) return folders;
+            
+            // Add the root folder itself
+            folders.Add(path);
+            
+            // Use an iterative approach with a stack to avoid potential stack overflow
+            var directories = new Stack<string>();
+            directories.Push(path);
+            
+            while (directories.Count > 0)
+            {
+                string currentDir = directories.Pop();
+                
+                try
+                {
+                    foreach (var dir in Directory.EnumerateDirectories(currentDir))
+                    {
+                        folders.Add(dir);
+                        directories.Push(dir);
+                    }
+                }
+                catch (UnauthorizedAccessException)
+                {
+                    throw new UnauthorizedAccessException($"Access to directory {currentDir} is denied");
+                }
+                catch (IOException)
+                {
+                    throw new IOException($"Error accessing directory {currentDir}");
+                }
+            }
+            
+            return folders;
+        }
     }
 }

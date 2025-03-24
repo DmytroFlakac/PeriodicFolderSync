@@ -1,7 +1,12 @@
 ﻿namespace PeriodicFolderSync.Interfaces;
 
 /// <summary>
-/// Provides operations for managing folders with retry capabilities.
+/// Interface for folder operations that abstracts common directory manipulation tasks.
+/// This interface provides methods to:
+/// - Copy folders with various options (recursive, overwrite)
+/// - Delete folders safely
+/// - Move folders between locations
+/// - Handle error conditions like missing directories or permission issues
 /// </summary>
 public interface IFolderOperator
 {
@@ -11,11 +16,10 @@ public interface IFolderOperator
     /// <param name="sourcePath">The path of the folder to copy.</param>
     /// <param name="destPath">The destination path where the folder will be copied to.</param>
     /// <param name="overwrite">If true, overwrites files and folders at the destination if they exist; otherwise, throws an exception.</param>
-    /// <param name="recursive">If true, copies all subdirectories and their contents; otherwise, only copies files in the root directory.</param>
     /// <returns>A task representing the asynchronous operation.</returns>
     /// <exception cref="System.IO.DirectoryNotFoundException">Thrown when the source folder does not exist.</exception>
     /// <exception cref="System.IO.IOException">Thrown when the destination folder exists and overwrite is false.</exception>
-    Task CopyFolderAsync(string sourcePath, string destPath, bool overwrite = false, bool recursive = true);
+    Task CopyFolderAsync(string sourcePath, string destPath, bool overwrite = false);
     
     /// <summary>
     /// Asynchronously deletes a folder at the specified path.

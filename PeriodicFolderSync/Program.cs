@@ -21,23 +21,15 @@ namespace PeriodicFolderSync
         {
             var services = new ServiceCollection();
 
-            // Register logging
             services.AddLogging(config => config.AddConsole());
-
-            // Register file system and operators
             services.AddSingleton<IFileSystem, FileSystem>();
             services.AddSingleton<IFolderOperator, FolderOperator>();
             services.AddSingleton<IFileOperator, FileOperator>();
-
-            // Register match strategy
             services.AddSingleton<IMatchStrategy, ContentBasedMatchStrategy>();
-            services.AddSingleton<IFileComparer, FileComparer>(); // Add this line
-            // Register synchronizers
+            services.AddSingleton<IFileComparer, FileComparer>(); 
             services.AddSingleton<IFolderSynchronizer, FolderSynchronizer>();
             services.AddSingleton<IFileSynchronizer, FileSynchronizer>();
             services.AddSingleton<ISynchronizer, Synchronizer>();
-
-            // Register CliProcessor
             services.AddSingleton<ICliProcessor, CliProcessor>();
             services.AddSingleton<IScheduler, Scheduler>();
 

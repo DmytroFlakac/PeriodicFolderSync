@@ -24,8 +24,8 @@ public class FileSystemOperator(
     public Task MoveFileAsync(string sourcePath, string destPath, bool overwrite = false) =>
         _fileOperator.MoveFileAsync(sourcePath, destPath, overwrite);
     
-    public Task CopyFolderAsync(string sourcePath, string destPath, bool overwrite = false, bool recursive = true) =>
-        _folderOperator.CopyFolderAsync(sourcePath, destPath, overwrite, recursive);
+    public Task CopyFolderAsync(string sourcePath, string destPath, bool overwrite = false) =>
+        _folderOperator.CopyFolderAsync(sourcePath, destPath, overwrite);
 
     public Task DeleteFolderAsync(string path, bool recursive = true) =>
         _folderOperator.DeleteFolderAsync(path, recursive);

@@ -27,6 +27,10 @@ namespace PeriodicFolderSync.Core
             _logger.LogInformation("Synchronization completed");
         }
 
+        /// <summary>
+        /// Logs a summary of the synchronization statistics.
+        /// </summary>
+        /// <param name="stats">The statistics object containing synchronization metrics.</param>
         private void LogSummary(SyncStatistics stats)
         {
             _logger.LogInformation(

@@ -19,8 +19,8 @@ namespace PeriodicFolderSync.Core
 
         public async Task SynchronizeFilesAsync(string source, string destination, SyncStatistics stats, bool useOverwrite)
         {
-            var sourceFiles = GetAllFiles(source);
-            var destFiles = GetAllFiles(destination);
+            var sourceFiles = _fileSystem.GetAllFiles(source);
+            var destFiles = _fileSystem.GetAllFiles(destination);
             var destFilesBySize = GetDestinationFilesBySize(destFiles);
             var processedDestFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
@@ -54,6 +54,10 @@ namespace PeriodicFolderSync.Core
             await ProcessExtraDestinationFiles(destFiles, processedDestFiles, stats);
         }
 
+        /// <summary>
+        /// Ensures that the directory for the specified file path exists, creating it if necessary.
+        /// </summary>
+        /// <param name="filePath">The file path whose directory should exist.</param>
         private void EnsureDestinationDirectoryExists(string filePath)
         {
             string? destDir = Path.GetDirectoryName(filePath);
@@ -64,6 +68,16 @@ namespace PeriodicFolderSync.Core
             }
         }
 
+        /// <summary>
+        /// Handles the case when a destination file is missing by either finding a matching file to move or copying the source file.
+        /// </summary>
+        /// <param name="sourceFile">The source file path.</param>
+        /// <param name="destFile">The destination file path.</param>
+        /// <param name="destFilesBySize">Dictionary of destination files grouped by size.</param>
+        /// <param name="processedDestFiles">Set of destination files that have already been processed.</param>
+        /// <param name="stats">Statistics object to track synchronization metrics.</param>
+        /// <param name="useOverwrite">If true, overwrites existing files at the destination.</param>
+        /// <returns>A task representing the asynchronous operation.</returns>
         private async Task HandleMissingDestinationFile(
             string sourceFile,
             string destFile,
@@ -96,6 +110,13 @@ namespace PeriodicFolderSync.Core
             stats.ChangedCount++;
         }
 
+        /// <summary>
+        /// Updates a destination file if it differs from the source file.
+        /// </summary>
+        /// <param name="sourceFile">The source file path.</param>
+        /// <param name="destFile">The destination file path.</param>
+        /// <param name="stats">Statistics object to track synchronization metrics.</param>
+        /// <returns>A task representing the asynchronous operation.</returns>
         private async Task UpdateFileIfModified(string sourceFile, string destFile, SyncStatistics stats)
         {
             var sourceInfo = _fileSystem.GetFileInfo(sourceFile);
@@ -109,6 +130,13 @@ namespace PeriodicFolderSync.Core
             }
         }
 
+        /// <summary>
+        /// Processes files in the destination that don't exist in the source, deleting them if necessary.
+        /// </summary>
+        /// <param name="destFiles">Set of all destination files.</param>
+        /// <param name="processedDestFiles">Set of destination files that have already been processed.</param>
+        /// <param name="stats">Statistics object to track synchronization metrics.</param>
+        /// <returns>A task representing the asynchronous operation.</returns>
         private async Task ProcessExtraDestinationFiles(
             HashSet<string> destFiles,
             HashSet<string> processedDestFiles,
@@ -124,17 +152,12 @@ namespace PeriodicFolderSync.Core
                 stats.DeletedFiles++;
             }
         }
-
-        private HashSet<string> GetAllFiles(string path)
-        {
-            var files = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            if (!_fileSystem.DirectoryExists(path)) return files;
-            files.UnionWith(_fileSystem.GetFiles(path));
-            foreach (var dir in _fileSystem.GetDirectories(path))
-                files.UnionWith(GetAllFiles(dir));
-            return files;
-        }
-
+        
+        /// <summary>
+        /// Groups destination files by their size for efficient matching.
+        /// </summary>
+        /// <param name="destFiles">Set of all destination files.</param>
+        /// <returns>A dictionary mapping file sizes to lists of files with that size.</returns>
         private Dictionary<long, List<string>> GetDestinationFilesBySize(HashSet<string> destFiles)
         {
             return destFiles
