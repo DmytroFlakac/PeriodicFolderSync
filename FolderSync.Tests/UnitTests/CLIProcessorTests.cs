@@ -187,7 +187,7 @@ namespace FolderSync.Tests.UnitTests
 
             var result = await testCliProcessor.GetInteractiveInputIfNeededAsync(emptyArgs);
 
-            Assert.Equal(6, result.Length);
+            Assert.Equal(8, result.Length);
             Assert.Equal("--source", result[0]);
             Assert.Equal("C:\\source", result[1]);
             Assert.Equal("--destination", result[2]);
@@ -211,7 +211,7 @@ namespace FolderSync.Tests.UnitTests
             
             var result = await testCliProcessor.GetInteractiveInputIfNeededAsync(emptyArgs);
 
-            Assert.Equal(4, result.Length);
+            Assert.Equal(6, result.Length);
             Assert.Equal("--source", result[0]);
             Assert.Equal("C:\\source", result[1]);
             Assert.Equal("--destination", result[2]);
@@ -233,14 +233,15 @@ namespace FolderSync.Tests.UnitTests
 
             var result = await testCliProcessor.GetInteractiveInputIfNeededAsync(emptyArgs);
 
-            Assert.Equal(7, result.Length);
+            Assert.Equal(8, result.Length);
             Assert.Equal("--source", result[0]);
             Assert.Equal("C:\\source", result[1]);
             Assert.Equal("--destination", result[2]);
             Assert.Equal("C:\\destination", result[3]);
             Assert.Equal("--interval", result[4]);
             Assert.Equal("5m", result[5]);
-            Assert.Equal("--admin", result[6]);
+            Assert.Equal("--log-file", result[6]);
+            Assert.Equal("y", result[7]);
         }
     }
 

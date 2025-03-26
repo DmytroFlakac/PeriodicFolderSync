@@ -15,7 +15,7 @@ namespace FolderSync.Tests.E2ETests
         private readonly string _sourceFolder;
         private readonly string _destinationFolder;
         private readonly ServiceProvider _serviceProvider;
-
+        
         public SynchronizationE2ETests()
         {
             _sourceFolder = Path.Combine(Path.GetTempPath(), "FolderSyncE2E_Source_" + Guid.NewGuid().ToString());
@@ -26,6 +26,11 @@ namespace FolderSync.Tests.E2ETests
 
             var services = new ServiceCollection();
             services.AddLogging(config => config.AddConsole());
+            
+            var loggerFactory = LoggerFactory.Create(builder => builder.AddConsole());
+            var logConfigProvider = new LogConfigurationProvider(loggerFactory);
+            services.AddSingleton<ILogConfigurationProvider>(logConfigProvider);
+            
             services.AddSingleton<IFileSystem, FileSystem>();
             services.AddSingleton<IFolderOperator, FolderOperator>();
             services.AddSingleton<IFileOperator, FileOperator>();
@@ -34,7 +39,6 @@ namespace FolderSync.Tests.E2ETests
             services.AddSingleton<IFolderSynchronizer, FolderSynchronizer>();
             services.AddSingleton<IFileSynchronizer, FileSynchronizer>();
             services.AddSingleton<ISynchronizer, Synchronizer>();
-            // Add the missing AdminPrivilegeHandler registration
             services.AddSingleton<IAdminPrivilegeHandler, AdminPrivilegeHandler>();
             services.AddSingleton<ICLIProcessor, CLIProcessor>();
             services.AddSingleton<IScheduler, Scheduler>();

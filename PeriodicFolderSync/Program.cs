@@ -17,8 +17,9 @@ namespace PeriodicFolderSync
             var loggerFactory = tempProvider.GetRequiredService<ILoggerFactory>();
             
             var logConfigProvider = new LogConfigurationProvider(loggerFactory);
+            string logFilePath = logConfigProvider.GetLogFilePath();
             
-            var serviceProvider = ConfigureServices(logConfigProvider, loggerFactory);
+            var serviceProvider = ConfigureServices(logConfigProvider, loggerFactory, logFilePath);
             var cliProcessor = serviceProvider.GetRequiredService<ICLIProcessor>();
             
             try
@@ -41,14 +42,14 @@ namespace PeriodicFolderSync
             }
         }
 
-        private static ServiceProvider ConfigureServices(ILogConfigurationProvider logConfigProvider, ILoggerFactory loggerFactory)
+        private static ServiceProvider ConfigureServices(ILogConfigurationProvider logConfigProvider, ILoggerFactory loggerFactory, string logFilePath)
         {
             var services = new ServiceCollection();
 
             services.AddSingleton(loggerFactory);
             services.AddLogging(config => 
             {
-                (loggerFactory as LoggerFactory)?.AddFile(logConfigProvider.GetLogFilePath());
+                (loggerFactory as LoggerFactory)?.AddFile(logFilePath);
             });
             
             services.AddSingleton<ILogConfigurationProvider>(logConfigProvider);
