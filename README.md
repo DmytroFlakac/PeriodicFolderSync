@@ -36,7 +36,6 @@ pwsh ./publish-all.ps1 -Mac
 ### Windows
 ```powershell
 git clone https://github.com/DmytroFlakac/PeriodicFolderSync.git
-cd PeriodicFolderSync
 dotnet publish -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true
 .\publish\win-x64\PeriodicFolderSync.exe -s "C:\Source" -d "D:\Backup"
  ```
