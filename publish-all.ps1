@@ -23,7 +23,7 @@ if ($All -or $Mac) {
 }
 
 # Create output directory
-$outputDir = "d:\PeriodicFolderSync\publish"
+$outputDir = ".\publish"
 if (-not (Test-Path $outputDir)) {
     New-Item -ItemType Directory -Path $outputDir | Out-Null
 }
