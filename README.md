@@ -19,7 +19,6 @@ cd PeriodicFolderSync
 .\publish-all.ps1 -Windows
 .\publish\win-x64\PeriodicFolderSync.exe -s "C:\Source" -d "D:\Backup"
  ```
-```
 
 ### Linux
 ```bash
@@ -28,7 +27,6 @@ cd PeriodicFolderSync
 pwsh ./publish-all.ps1 -Linux
 ./publish/linux-x64/PeriodicFolderSync -s "/home/user/docs" -d "/mnt/backup"
  ```
-```
 
 ### macOS
 ```bash
@@ -36,7 +34,6 @@ git clone https://github.com/DmytroFlakac/PeriodicFolderSync.git
 cd PeriodicFolderSync
 pwsh ./publish-all.ps1 -Mac
 ./publish/osx-x64/PeriodicFolderSync -s "/Users/username/Documents" -d "/Volumes/Backup"
- ```
 ```
 
 ## 🛠️ Manual Setup (For Advanced Users)
@@ -47,7 +44,6 @@ cd PeriodicFolderSync
 dotnet publish -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true
 .\publish\win-x64\PeriodicFolderSync.exe -s "C:\Source" -d "D:\Backup"
  ```
-```
 
 ### Linux
 ```bash
@@ -57,7 +53,6 @@ dotnet publish -c Release -r linux-x64 --self-contained true
 chmod +x ./publish/linux-x64/PeriodicFolderSync
 ./publish/linux-x64/PeriodicFolderSync -s "/home/user/docs" -d "/mnt/backup"
  ```
-```
 
 ### macOS
 ```bash
@@ -67,7 +62,6 @@ dotnet publish -c Release -r osx-x64 --self-contained true
 chmod +x ./publish/osx-x64/PeriodicFolderSync
 ./publish/osx-x64/PeriodicFolderSync -s "/Users/username/Documents" -d "/Volumes/Backup"
  ```
-```
 
 ## 🔧 Build Script Options
 The publish-all.ps1 script provides flexible build options:
