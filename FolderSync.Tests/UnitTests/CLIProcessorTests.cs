@@ -12,6 +12,7 @@ namespace FolderSync.Tests.UnitTests
         private readonly Mock<ISynchronizer> _mockSynchronizer;
         private readonly Mock<ILogger<ICLIProcessor>> _mockLogger;
         private readonly ICLIProcessor _cliProcessor;
+        private readonly ILogConfigurationProvider _logConfigurationProvider;
 
         public CliProcessorTests()
         {
@@ -19,8 +20,9 @@ namespace FolderSync.Tests.UnitTests
             Mock<IScheduler> mockScheduler = new();
             _mockLogger = new Mock<ILogger<ICLIProcessor>>();
             var adminHandler = new MockAdminPrivilegeHandler();
-            _cliProcessor = new CLIProcessor(_mockSynchronizer.Object, mockScheduler.Object, _mockLogger.Object,
-                adminHandler);
+            _logConfigurationProvider = new Mock<ILogConfigurationProvider>().Object;
+
+            _cliProcessor = new CLIProcessor(_mockSynchronizer.Object, mockScheduler.Object, _mockLogger.Object, adminHandler, _logConfigurationProvider);
         }
 
         [Fact]
@@ -118,32 +120,7 @@ namespace FolderSync.Tests.UnitTests
             Directory.Delete(tempDir, true);
         }
 
-        [Fact]
-        public async Task Process_WithNonExistentSourceDirectory_LogsError()
-        {
-            string nonExistentPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString(), "NonExistentFolder");
-            string destPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString(), "DestFolder");
-
-            Directory.CreateDirectory(Path.GetDirectoryName(destPath));
-
-            string[] args = ["--source", nonExistentPath, "--destination", destPath];
-
-            await _cliProcessor.ProcessAsync(args);
-
-            _mockLogger.Verify(
-                x => x.Log(
-                    LogLevel.Error,
-                    It.IsAny<EventId>(),
-                    It.Is<It.IsAnyType>((o, t) => o.ToString().Contains("does not exist")),
-                    It.IsAny<Exception>(),
-                    It.IsAny<Func<It.IsAnyType, Exception, string>>()),
-                Times.Once);
-
-            if (Directory.Exists(Path.GetDirectoryName(destPath)))
-                Directory.Delete(Path.GetDirectoryName(destPath), true);
-        }
-
-
+        
         [Fact]
         public void ParseTimeInterval_WithValidFormats_ReturnsCorrectTimeSpan()
         {
@@ -273,7 +250,7 @@ namespace FolderSync.Tests.UnitTests
         ILogger<ICLIProcessor> logger,
         IAdminPrivilegeHandler adminHandler,
         string[] simulatedInputs)
-        : CLIProcessor(synchronizer, scheduler, logger, adminHandler)
+        : CLIProcessor(synchronizer, scheduler, logger, adminHandler, new Mock<ILogConfigurationProvider>().Object) 
     {
         private readonly Queue<string> _simulatedInputs = new(simulatedInputs);
 

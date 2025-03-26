@@ -1,4 +1,3 @@
-markdown
 # PeriodicFolderSync 🔄
 
 ![Version](https://img.shields.io/badge/version-2.2.1-blue)
@@ -34,7 +33,7 @@ git clone https://github.com/DmytroFlakac/PeriodicFolderSync.git
 cd PeriodicFolderSync
 pwsh ./publish-all.ps1 -Mac
 ./publish/osx-x64/PeriodicFolderSync -s "/Users/username/Documents" -d "/Volumes/Backup"
-```
+ ```
 
 ## 🛠️ Manual Setup (For Advanced Users)
 ### Windows
@@ -52,7 +51,7 @@ cd PeriodicFolderSync
 dotnet publish -c Release -r linux-x64 --self-contained true
 chmod +x ./publish/linux-x64/PeriodicFolderSync
 ./publish/linux-x64/PeriodicFolderSync -s "/home/user/docs" -d "/mnt/backup"
- ```
+```
 
 ### macOS
 ```bash
@@ -62,6 +61,7 @@ dotnet publish -c Release -r osx-x64 --self-contained true
 chmod +x ./publish/osx-x64/PeriodicFolderSync
 ./publish/osx-x64/PeriodicFolderSync -s "/Users/username/Documents" -d "/Volumes/Backup"
  ```
+
 
 ## 🔧 Build Script Options
 The publish-all.ps1 script provides flexible build options:
@@ -96,6 +96,10 @@ PeriodicFolderSync offers a comprehensive set of features:
 - Interactive setup : Guided setup when no arguments are provided
 ### Security
 - Administrator mode : Run with elevated privileges when needed
+### Logging
+- Default logging : Automatically logs to the logs directory
+- Custom log files : Specify custom log file paths
+- Dynamic log naming : Automatically creates log files named after synchronized folders
 ## 📋 Command Reference
 ### Basic Commands
 ```powershell
@@ -110,17 +114,24 @@ PeriodicFolderSync offers a comprehensive set of features:
 
 # Run periodic sync (every hour)
 .\PeriodicFolderSync.exe -s "C:\Source" -d "D:\Backup" -i 1h
+
+# Run with custom log file
+.\PeriodicFolderSync.exe -s "C:\Source" -d "D:\Backup" -l "C:\logs\sync.log"
+
+# Run with custom log directory (auto-generates filename)
+.\PeriodicFolderSync.exe -s "C:\Source" -d "D:\Backup" -l "C:\logs\"
  ```
 
-### Command-Line Options Option Aliases Description --source , -s
+### Command-Line Options
 
-Source directory path (required) --destination , -d
+| Option | Aliases | Description |
+|--------|---------|-------------|
+| --source | -s | Source directory path (required) |
+| --destination | -d | Destination directory path (required) |
+| --interval | -i | Sync interval (e.g., 15s, 1m, 1h, 1d, 1y) |
+| --admin | | Run with administrator privileges |
+| --log-file | -l | Custom log file path or directory |
 
-Destination directory path (required) --interval , -i
-
-Sync interval (e.g., 15s, 1m, 1h, 1d, 1y) --admin
-
-Run with administrator privileges
 ### Interactive Mode
 If you run the application without arguments, it will prompt you for:
 
@@ -131,7 +142,7 @@ If you run the application without arguments, it will prompt you for:
 ## ⚙️ Configuration Options
 ### Time Interval Formats
 PeriodicFolderSync supports the following time interval formats:
- Format Description Example Ns
+Format Description Example Ns
 
 N seconds
 
@@ -158,12 +169,20 @@ You can also specify intervals in minutes by providing just a number:
 .\PeriodicFolderSync.exe -s "C:\Source" -d "D:\Backup" -i 30
  ```
 
+### Logging Options
+PeriodicFolderSync provides flexible logging options:
+
+- Default logging : By default, logs are written to the logs directory with a date-based filename
+- Custom log file : Specify an exact log file path with -l "path/to/logfile.log"
+- Custom log directory : Specify just a directory with -l "path/to/directory/" and a filename will be auto-generated based on the source and destination folder names
+When specifying a custom log directory (ending with / or \ ), the application will automatically create a log file with the format:
+
+```plaintext
+sync_[source-folder]_to_[destination-folder]_[timestamp].log
+```
+
 ### Stopping the Scheduler
 To stop a running scheduler, press Ctrl+C. The application will gracefully shut down.
 
 ## 📄 License
-MIT License
-
-## 📚 Resources
-📖 Technical Docs 🐞 Report Issues 📦 Download Latest Release
-
+MIT License - See [LICENSE](LICENSE) for details.

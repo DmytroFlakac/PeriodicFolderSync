@@ -9,13 +9,15 @@ namespace PeriodicFolderSync.Core
         ISynchronizer synchronizer,
         IScheduler scheduler,
         ILogger<ICLIProcessor> logger,
-        IAdminPrivilegeHandler adminHandler)
+        IAdminPrivilegeHandler adminHandler,
+        ILogConfigurationProvider logConfigProvider)
         : ICLIProcessor
     {
         private readonly ISynchronizer _synchronizer = synchronizer ?? throw new ArgumentNullException(nameof(synchronizer));
         private readonly IScheduler _scheduler = scheduler ?? throw new ArgumentNullException(nameof(scheduler));
         private readonly ILogger<ICLIProcessor> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         private readonly IAdminPrivilegeHandler _adminHandler = adminHandler ?? throw new ArgumentNullException(nameof(adminHandler));
+        private readonly ILogConfigurationProvider _logConfigProvider = logConfigProvider ?? throw new ArgumentNullException(nameof(logConfigProvider));
 
         public async Task<int> ProcessAsync(string?[] args)
         {
@@ -43,16 +45,47 @@ namespace PeriodicFolderSync.Core
                 aliases: ["--admin"],
                 description: "Run with administrator privileges");
 
+            var logFileOption = new Option<string>(
+                aliases: ["--log-file", "-l"],
+                description: "Custom log file path");
+
             rootCommand.AddOption(sourceOption);
             rootCommand.AddOption(destinationOption);
             rootCommand.AddOption(intervalOption);
             rootCommand.AddOption(adminOption);
+            rootCommand.AddOption(logFileOption);  
 
-            rootCommand.SetHandler(async (source, destination, interval, runAsAdmin) =>
+            rootCommand.SetHandler(async (source, destination, interval, runAsAdmin, logFilePath) =>
             {
                 try
                 {
-                    // Check if admin mode is requested but not already running as admin
+                    if (!string.IsNullOrWhiteSpace(logFilePath))
+                    {
+                        if (logFilePath.EndsWith("/") || logFilePath.EndsWith("\\"))
+                        {
+                            string sourceName = Path.GetFileName(source.TrimEnd('\\', '/'));
+                            string destName = Path.GetFileName(destination.TrimEnd('\\', '/'));
+                            string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+                            
+                            logFilePath = Path.Combine(logFilePath, $"sync_{sourceName}_to_{destName}_{timestamp}.log");
+                        }
+                        
+                        string? directory = Path.GetDirectoryName(logFilePath);
+                        if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+                        {
+                            Directory.CreateDirectory(directory);
+                        }
+                        
+                        _logConfigProvider.SetLogFilePath(logFilePath);
+                        _logger.LogInformation($"Using custom log file: {logFilePath}");
+                    }
+                    else
+                    {
+                        logFilePath = _logConfigProvider.CreateDynamicLogFileName(source, destination);
+                        _logConfigProvider.SetLogFilePath(logFilePath);
+                    }
+                    
+                    
                     if (runAsAdmin && !_adminHandler.IsRunningAsAdmin())
                     {
                         _adminHandler.RestartAsAdmin(args);
@@ -124,7 +157,7 @@ namespace PeriodicFolderSync.Core
                     _logger.LogError($"Error: {ex.Message}");
                     throw;
                 }
-            }, sourceOption, destinationOption, intervalOption, adminOption);
+            }, sourceOption, destinationOption, intervalOption, adminOption, logFileOption);
 
             return await rootCommand.InvokeAsync(args!);
         }
@@ -184,20 +217,37 @@ namespace PeriodicFolderSync.Core
             Console.Write("Sync interval (e.g. '5m' for 5 minutes, '1h' for 1 hour, or 'once' for one-time sync): ");
             string? intervalInput = ReadLineFromConsole();
             
+            Console.Write("Custom log file path (leave empty for default): ");
+            string? logFilePath = ReadLineFromConsole();
+            
             Console.Write("Run with administrator privileges? (y/n): ");
             string? adminInput = ReadLineFromConsole();
             bool runAsAdmin = adminInput?.Trim().Equals("y", StringComparison.OrdinalIgnoreCase) ?? false;
             
-            if (intervalInput?.Equals("once", StringComparison.OrdinalIgnoreCase) ?? false)
+            var argsList = new List<string?>();
+            argsList.Add("--source");
+            argsList.Add(sourceFolder);
+            argsList.Add("--destination");
+            argsList.Add(destinationFolder);
+            
+            if (!string.IsNullOrWhiteSpace(intervalInput) && !intervalInput.Equals("once", StringComparison.OrdinalIgnoreCase))
             {
-                return Task.FromResult<string?[]>(runAsAdmin 
-                    ? ["--source", sourceFolder, "--destination", destinationFolder, "--admin"]
-                    : ["--source", sourceFolder, "--destination", destinationFolder]);
+                argsList.Add("--interval");
+                argsList.Add(intervalInput);
             }
             
-            return Task.FromResult<string?[]>(runAsAdmin
-                ? ["--source", sourceFolder, "--destination", destinationFolder, "--interval", intervalInput, "--admin"]
-                : ["--source", sourceFolder, "--destination", destinationFolder, "--interval", intervalInput]);
+            if (!string.IsNullOrWhiteSpace(logFilePath))
+            {
+                argsList.Add("--log-file");
+                argsList.Add(logFilePath);
+            }
+            
+            if (runAsAdmin)
+            {
+                argsList.Add("--admin");
+            }
+            
+            return Task.FromResult(argsList.ToArray());
         }
     }
 }

@@ -11,7 +11,14 @@ namespace PeriodicFolderSync
     {
         public static async Task Main(string?[] args)
         {
-            var serviceProvider = ConfigureServices();
+            var services = new ServiceCollection();
+            services.AddLogging(config => config.AddConsole());
+            var tempProvider = services.BuildServiceProvider();
+            var loggerFactory = tempProvider.GetRequiredService<ILoggerFactory>();
+            
+            var logConfigProvider = new LogConfigurationProvider(loggerFactory);
+            
+            var serviceProvider = ConfigureServices(logConfigProvider, loggerFactory);
             var cliProcessor = serviceProvider.GetRequiredService<ICLIProcessor>();
             
             try
@@ -26,17 +33,26 @@ namespace PeriodicFolderSync
                 var exitCode = await cliProcessor.ProcessAsync(args);
                 Environment.Exit(exitCode);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                var logger = serviceProvider.GetRequiredService<ILogger<object>>();
+                logger.LogError(ex, "An unhandled exception occurred");
                 Environment.Exit(-1);
             }
         }
 
-        private static ServiceProvider ConfigureServices()
+        private static ServiceProvider ConfigureServices(ILogConfigurationProvider logConfigProvider, ILoggerFactory loggerFactory)
         {
             var services = new ServiceCollection();
 
-            services.AddLogging(config => config.AddConsole());
+            services.AddSingleton(loggerFactory);
+            services.AddLogging(config => 
+            {
+                (loggerFactory as LoggerFactory)?.AddFile(logConfigProvider.GetLogFilePath());
+            });
+            
+            services.AddSingleton<ILogConfigurationProvider>(logConfigProvider);
+            
             services.AddSingleton<IFileSystem, FileSystem>();
             services.AddSingleton<IFolderOperator, FolderOperator>();
             services.AddSingleton<IFileOperator, FileOperator>();
