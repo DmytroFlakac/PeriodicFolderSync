@@ -55,18 +55,16 @@ namespace PeriodicFolderSync.Interfaces
         /// </summary>
         /// <param name="sourcePath">The source file path.</param>
         /// <param name="destPath">The destination file path.</param>
-        /// <param name="overwrite">True to overwrite if the destination file already exists; otherwise, false.</param>
         /// <returns>A task that represents the asynchronous copy operation.</returns>
-        Task CopyFileAsync(string sourcePath, string destPath, bool overwrite = false);
+        Task CopyFileAsync(string sourcePath, string destPath);
 
         /// <summary>
         /// Asynchronously copies a folder to a new location.
         /// </summary>
         /// <param name="sourcePath">The source file path.</param>
         /// <param name="destPath">The destination file path.</param>
-        /// <param name="overwrite">True to overwrite if the destination file already exists; otherwise, false.</param>
         /// <returns>A task that represents the asynchronous copy operation.</returns>
-        Task CopyFolderAsync(string sourcePath, string destPath, bool overwrite = false);
+        Task CopyFolderAsync(string sourcePath, string destPath);
 
         /// <summary>
         /// Asynchronously deletes the specified file.
@@ -80,9 +78,8 @@ namespace PeriodicFolderSync.Interfaces
         /// </summary>
         /// <param name="sourcePath">The source file path.</param>
         /// <param name="destPath">The destination file path.</param>
-        /// <param name="overwrite">True to overwrite if the destination file already exists; otherwise, false.</param>
         /// <returns>A task that represents the asynchronous move operation.</returns>
-        Task MoveFileAsync(string sourcePath, string destPath, bool overwrite = false);
+        Task MoveFileAsync(string sourcePath, string destPath);
         
         
         // Directory operations
@@ -146,20 +143,6 @@ namespace PeriodicFolderSync.Interfaces
         /// <param name="path">The directory path.</param>
         /// <returns>A DirectoryInfo object containing information about the directory.</returns>
         DirectoryInfo GetDirectoryInfo(string path);
-        
-        /// <summary>
-        /// Gets all directories within the specified directory.
-        /// </summary>
-        /// <param name="path">The directory path to search.</param>
-        /// <returns>An array of DirectoryInfo objects.</returns>
-        DirectoryInfo[] GetDirectories(DirectoryInfo directory);
-        
-        /// <summary>
-        /// Gets all files within the specified directory.
-        /// </summary>
-        /// <param name="directory">The DirectoryInfo object representing the directory to search.</param>
-        /// <returns>An array of FileInfo objects.</returns>
-        FileInfo[] GetFiles(DirectoryInfo directory);
 
         // Add this method to the interface
         /// <summary>

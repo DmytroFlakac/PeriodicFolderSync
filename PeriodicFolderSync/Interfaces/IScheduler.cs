@@ -16,9 +16,8 @@
         /// <param name="source">Source directory path.</param>
         /// <param name="destination">Destination directory path.</param>
         /// <param name="interval">Time interval between synchronization operations.</param>
-        /// <param name="useOverwrite">If true, overwrites existing files and folders at the destination.</param>
         /// <returns>A task representing the asynchronous operation.</returns>
-        Task Start(string source, string destination, TimeSpan interval, bool useOverwrite);
+        Task Start(string source, string destination, TimeSpan interval);
         
         /// <summary>
         /// Stops the scheduler and any ongoing synchronization operations.

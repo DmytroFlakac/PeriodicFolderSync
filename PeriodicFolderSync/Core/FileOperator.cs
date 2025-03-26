@@ -12,31 +12,25 @@ public class FileOperator(
     FileSystemOperatorBase(logger, retryCount, retryDelay), 
     IFileOperator
 {
-    protected override void Validate(string sourcePath, string destPath, string operation, bool overwrite = false)
+    
+    private readonly IFileSystem _fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
+    private readonly IFileComparer _fileComparer = fileComparer ?? throw new ArgumentNullException(nameof(fileComparer));
+    
+    
+    protected override void Validate(string sourcePath, string destPath, string operation)
     {
         ValidatePaths(sourcePath, destPath, operation);
-        if(!fileSystem.FileExists(sourcePath))
+        if(!_fileSystem.FileExists(sourcePath))
             throw new FileNotFoundException($"Source file not found {sourcePath}");
     }
 
-    public async Task CopyFileAsync(string sourcePath, string destPath, bool overwrite = false)
+    public async Task CopyFileAsync(string sourcePath, string destPath)
     {
-        Validate(sourcePath, destPath, nameof(CopyFileAsync), overwrite);
+        Validate(sourcePath, destPath, nameof(CopyFileAsync));
         
-        fileSystem.CreateDirectoryIfNotExist(destPath);
-
-        if (fileSystem.FileExists(destPath) && overwrite)
-        {
-            if (await fileComparer.AreFilesIdenticalAsync(sourcePath, destPath))
-            {
-                logger.LogInformation($"Skipping unchanged file: {destPath}");
-                return;
-            }
-        }
-
         await WithRetryAsync(async () =>
         {
-            await fileSystem.CopyFileAsync(sourcePath, destPath, overwrite);
+            await _fileSystem.CopyFileAsync(sourcePath, destPath);
         }, $"Copy file from {sourcePath} to {destPath}");
     }
 
@@ -44,27 +38,22 @@ public class FileOperator(
     {
         ValidatePath(path, nameof(DeleteFileAsync));
         
-        if (!fileSystem.FileExists(path))
+        if (!_fileSystem.FileExists(path))
             return;
 
         await WithRetryAsync(async () => 
         {
-            await fileSystem.DeleteFileAsync(path);
+            await _fileSystem.DeleteFileAsync(path);
         }, $"Delete file {path}");
     }
 
-    public async Task MoveFileAsync(string sourcePath, string destPath, bool overwrite = false)
+    public async Task MoveFileAsync(string sourcePath, string destPath)
     {
-        Validate(sourcePath, destPath, nameof(MoveFileAsync), overwrite);
-
-        fileSystem.CreateDirectoryIfNotExist(destPath);
+        Validate(sourcePath, destPath, nameof(MoveFileAsync));
         
-        if (fileSystem.FileExists(destPath) && overwrite)
-            await DeleteFileAsync(destPath);
-
         await WithRetryAsync(async () => 
         {
-            await fileSystem.MoveFileAsync(sourcePath, destPath);
+            await _fileSystem.MoveFileAsync(sourcePath, destPath);
         }, $"Move file from {sourcePath} to {destPath}");
     }
     

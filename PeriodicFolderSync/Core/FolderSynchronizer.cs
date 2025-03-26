@@ -17,8 +17,8 @@ namespace PeriodicFolderSync.Core
         private readonly IMatchStrategy _matchStrategy = matchStrategy ?? throw new ArgumentNullException(nameof(matchStrategy));
         private readonly ILogger _logger = logger ?? throw new ArgumentNullException(nameof(logger));
        
-        public async Task SynchronizeFoldersAsync(string source, string destination, SyncStatistics stats, bool useOverwrite)
-        {
+        public async Task SynchronizeFoldersAsync(string source, string destination, SyncStatistics stats){
+            _fileSystem.CreateDirectoryIfNotExist(source);
             var sourceFolders = _fileSystem.GetAllFolders(source);
             var destFolders = _fileSystem.GetAllFolders(destination);
             var processedDestFolders = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -40,8 +40,7 @@ namespace PeriodicFolderSync.Core
                         destFolders, 
                         processedDestFolders, 
                         movedFolders,
-                        stats, 
-                        useOverwrite);
+                        stats);
                 }
                 else
                 {
@@ -69,7 +68,6 @@ namespace PeriodicFolderSync.Core
         /// <param name="processedDestFolders">Set of destination folders that have already been processed.</param>
         /// <param name="movedFolders">Dictionary tracking folders that have been moved.</param>
         /// <param name="stats">Statistics object to track synchronization metrics.</param>
-        /// <param name="useOverwrite">If true, overwrites existing folders at the destination.</param>
         /// <returns>A task representing the asynchronous operation.</returns>
         private async Task HandleMissingDestinationFolder(
             string source,
@@ -79,13 +77,12 @@ namespace PeriodicFolderSync.Core
             HashSet<string> destFolders,
             HashSet<string> processedDestFolders,
             Dictionary<string, string> movedFolders,
-            SyncStatistics stats,
-            bool useOverwrite)
+            SyncStatistics stats
+   )
         {
-            var sourceDirInfo = _fileSystem.GetDirectoryInfo(sourceFolder);
-            var sourceFileInfos = _fileSystem.GetFiles(sourceDirInfo);
-            var sourceSubDirs = _fileSystem.GetDirectories(sourceDirInfo);
-            bool hasContent = sourceFileInfos.Length > 0 || sourceSubDirs.Length > 0;
+            var sourceFiles = _fileSystem.GetAllFiles(sourceFolder);
+            var sourceSubDirs = _fileSystem.GetDirectories(sourceFolder);
+            bool hasContent = sourceFiles.Any() || sourceSubDirs.Any();
             
             if (hasContent)
             {
@@ -113,7 +110,26 @@ namespace PeriodicFolderSync.Core
                                            !p.Equals(destFolder, StringComparison.OrdinalIgnoreCase))
                                     .ToList();
                                     
-                                await _folderOperator.MoveFolderAsync(destFolder, destEquivalent, useOverwrite);
+                                try
+                                {
+                                    if (await _matchStrategy.IsFolderMatchAsync(sourceFolder, destFolder, _fileSystem, source, destination))
+                                    {
+                                        try
+                                        {
+                                            await _folderOperator.MoveFolderAsync(destFolder, destEquivalent);
+                                        }
+                                        catch (Exception ex)
+                                        {
+                                            _logger.LogWarning($"Failed to move folder: {ex.Message}. Creating new folder instead.");
+                                            await CopyFolderAndUpdateTracking(sourceFolder, destEquivalent, destFolders, processedDestFolders, stats, sourceFiles);
+                                            return;
+                                        }
+                                    }
+                                }
+                                catch (Exception ex)
+                                {
+                                    _logger.LogError($"Error checking folder match: {ex.Message}");
+                                }
                                 
                                 destFolders.Remove(destFolder);
                                 destFolders.Add(destEquivalent);
@@ -138,13 +154,13 @@ namespace PeriodicFolderSync.Core
                                 
                                 processedDestFolders.Add(destEquivalent);
                                 stats.FoldersMovedCount++;
-                                stats.FilesInMovedFolders += sourceFileInfos.Length;
+                                stats.FilesInMovedFolders += sourceFiles.Count();
                                 return;
                             }
                             catch (Exception ex)
                             {
                                 _logger.LogWarning($"Failed to move folder: {ex.Message}. Creating new folder instead.");
-                                await CopyFolderAndUpdateTracking(sourceFolder, destEquivalent, destFolders, processedDestFolders, stats, sourceFileInfos, useOverwrite);
+                                await CopyFolderAndUpdateTracking(sourceFolder, destEquivalent, destFolders, processedDestFolders, stats, sourceFiles);
                                 return;
                             }
                         }
@@ -155,8 +171,8 @@ namespace PeriodicFolderSync.Core
                     }
                 }
             }
-            
-            await CopyFolderAndUpdateTracking(sourceFolder, destEquivalent, destFolders, processedDestFolders, stats, sourceFileInfos, useOverwrite);
+
+            await CopyFolderAndUpdateTracking(sourceFolder, destEquivalent, destFolders, processedDestFolders, stats, sourceFiles);
         }
 
         /// <summary>
@@ -167,8 +183,7 @@ namespace PeriodicFolderSync.Core
         /// <param name="destFolders">Set of all destination folders.</param>
         /// <param name="processedDestFolders">Set of destination folders that have already been processed.</param>
         /// <param name="stats">Statistics object to track synchronization metrics.</param>
-        /// <param name="sourceFileInfos">Array of FileInfo objects for files in the source folder.</param>
-        /// <param name="useOverwrite">If true, overwrites existing folders at the destination.</param>
+        /// <param name="sourceFiles">The list of files in the source folder.</param>
         /// <returns>A task representing the asynchronous operation.</returns>
         private async Task CopyFolderAndUpdateTracking(
             string sourceFolder, 
@@ -176,24 +191,32 @@ namespace PeriodicFolderSync.Core
             HashSet<string> destFolders, 
             HashSet<string> processedDestFolders, 
             SyncStatistics stats, 
-            FileInfo[] sourceFileInfos, 
-            bool useOverwrite)
+            IEnumerable<string> sourceFiles)
         {
-            _logger.LogInformation($"Copying FOLDER: {sourceFolder} to {destEquivalent}");
-            await _folderOperator.CopyFolderAsync(sourceFolder, destEquivalent, useOverwrite);
-            
-            destFolders.Add(destEquivalent);
-            processedDestFolders.Add(destEquivalent);
-            
-            var newSubfolders = _fileSystem.GetDirectories(sourceFolder);
-            foreach (var subfolder in newSubfolders)
+            try
             {
-                destFolders.Add(subfolder);
-                processedDestFolders.Add(subfolder);
+                _logger.LogInformation($"Copying FOLDER: {sourceFolder} to {destEquivalent}");
+                await _folderOperator.CopyFolderAsync(sourceFolder, destEquivalent);
+                
+                destFolders.Add(destEquivalent);
+                processedDestFolders.Add(destEquivalent);
+                
+                var newSubfolders = _fileSystem.GetAllFolders(destEquivalent);
+                
+                foreach (var subfolder in newSubfolders)
+                {
+                    destFolders.Add(subfolder);
+                    processedDestFolders.Add(subfolder);
+                }
+                
+                stats.ChangedCount += sourceFiles.Count();
+                stats.FoldersChangedCount++;
+                stats.FoldersChangedCount += newSubfolders.Count;
             }
-            
-            stats.ChangedCount += sourceFileInfos.Length;
-            stats.FoldersChangedCount++;
+            catch (Exception ex)
+            {
+                _logger.LogError($"Error copying folder: {ex.Message}");
+            }
         }
 
         /// <summary>
@@ -228,12 +251,10 @@ namespace PeriodicFolderSync.Core
         
                 if (!sourceFolders.Contains(sourceEquivalent))
                 {
-                    var subDirs = destFolders
-                        .Where(p => p.StartsWith(destFolder + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) || 
-                                    p.Equals(destFolder, StringComparison.OrdinalIgnoreCase))
-                        .ToList();
+                    var subDirs = _fileSystem.GetAllFolders(destFolder);
             
                     _logger.LogInformation($"Deleting extra FOLDER: {destFolder} (not present in source)");
+                    int filesCount = _fileSystem.GetAllFiles(destFolder).Count;
                     await _folderOperator.DeleteFolderAsync(destFolder);
             
                     foreach (var subDir in subDirs)
@@ -242,6 +263,7 @@ namespace PeriodicFolderSync.Core
                     }
             
                     stats.DeletedFolders++;
+                    stats.DeletedFiles += filesCount;
                 }
             }
         }

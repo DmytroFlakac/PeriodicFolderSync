@@ -15,7 +15,7 @@ namespace PeriodicFolderSync.Core
 
         public Task WriteAllTextAsync(string path, string contents) => File.WriteAllTextAsync(path, contents);
 
-        public async Task CopyFileAsync(string sourcePath, string destPath, bool overwrite = false)
+        public async Task CopyFileAsync(string sourcePath, string destPath)
         {
             if (string.IsNullOrEmpty(sourcePath))
                 throw new ArgumentNullException(nameof(sourcePath));
@@ -23,15 +23,27 @@ namespace PeriodicFolderSync.Core
                 throw new ArgumentNullException(nameof(destPath));
             if (!File.Exists(sourcePath))
                 throw new FileNotFoundException("Source file not found.", sourcePath);
-            if (File.Exists(destPath) && !overwrite)
-                throw new IOException($"Destination file already exists: {destPath}");
-
-            await using (var sourceStream = new FileStream(sourcePath, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, true))
-            await using (var destStream = new FileStream(destPath, FileMode.Create, FileAccess.Write, FileShare.None, 4096, true))
+            
+            if (File.Exists(destPath))
             {
+                var destAttributes = File.GetAttributes(destPath);
+                if ((destAttributes & FileAttributes.ReadOnly) == FileAttributes.ReadOnly)
+                {
+                    File.SetAttributes(destPath, destAttributes & ~FileAttributes.ReadOnly);
+                }
+            }
+            
+            try
+            {
+                await using var sourceStream = new FileStream(sourcePath, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, true);
+                await using var destStream = new FileStream(destPath, FileMode.Create, FileAccess.Write, FileShare.None, 4096, true);
                 await sourceStream.CopyToAsync(destStream);
             }
-
+            catch (Exception ex)
+            {
+                throw new IOException($"Failed to copy file from {sourcePath} to {destPath}: {ex.Message}", ex);
+            }
+            
             try
             {
                 File.SetLastWriteTime(destPath, File.GetLastWriteTime(sourcePath));
@@ -71,10 +83,19 @@ namespace PeriodicFolderSync.Core
 
         public async Task DeleteFileAsync(string path)
         {
+            if (File.Exists(path))
+            {
+                var attributes = File.GetAttributes(path);
+                if ((attributes & FileAttributes.ReadOnly) == FileAttributes.ReadOnly)
+                {
+                    File.SetAttributes(path, attributes & ~FileAttributes.ReadOnly);
+                }
+            }
+            
             await Task.Run(() => File.Delete(path));
         }
 
-        public async Task MoveFileAsync(string sourcePath, string destPath, bool overwrite = false)
+        public async Task MoveFileAsync(string sourcePath, string destPath)
         {
             await Task.Run(() => File.Move(sourcePath, destPath));
         }
@@ -86,9 +107,8 @@ namespace PeriodicFolderSync.Core
 
         public void CreateDirectoryIfNotExist(string directoryPath)
         {
-            string? directory = Path.GetDirectoryName(directoryPath);
-            if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
-                Directory.CreateDirectory(directory);
+            if (!string.IsNullOrEmpty(directoryPath) && !Directory.Exists(directoryPath))
+                Directory.CreateDirectory(directoryPath);
         }
 
         public IEnumerable<string> GetFiles(string path) => Directory.EnumerateFiles(path);
@@ -101,11 +121,8 @@ namespace PeriodicFolderSync.Core
         
         public DirectoryInfo GetDirectoryInfo(string path) => new DirectoryInfo(path);
         
-        public DirectoryInfo[] GetDirectories(DirectoryInfo directory) => directory.GetDirectories();
         
-        public FileInfo[] GetFiles(DirectoryInfo directory) => directory.GetFiles();
-        
-        public async Task CopyFolderAsync(string sourcePath, string destPath, bool overwrite = false)
+        public async Task CopyFolderAsync(string sourcePath, string destPath)
         {
             if (string.IsNullOrEmpty(sourcePath))
                 throw new ArgumentNullException(nameof(sourcePath));
@@ -114,27 +131,19 @@ namespace PeriodicFolderSync.Core
             if (!Directory.Exists(sourcePath))
                 throw new DirectoryNotFoundException($"Source directory not found: {sourcePath}");
             
-            if (!Directory.Exists(destPath))
-            {
-                Directory.CreateDirectory(destPath);
-            }
-            else if (!overwrite)
-            {
-                throw new IOException($"Destination directory already exists: {destPath}");
-            }
-            
+            CreateDirectoryIfNotExist(destPath);
             foreach (var file in Directory.GetFiles(sourcePath))
             {
                 string fileName = Path.GetFileName(file);
                 string destFile = Path.Combine(destPath, fileName);
-                await CopyFileAsync(file, destFile, overwrite);
+                await CopyFileAsync(file, destFile);
             }
             
             foreach (var dir in Directory.GetDirectories(sourcePath))
             {
                 string dirName = Path.GetFileName(dir);
                 string destDir = Path.Combine(destPath, dirName);
-                await CopyFolderAsync(dir, destDir, overwrite);
+                await CopyFolderAsync(dir, destDir);
             }
             
             try
@@ -160,91 +169,84 @@ namespace PeriodicFolderSync.Core
 
         private bool IsCreationTimeSupported(string path)
         {
-            if (Directory.Exists(path))
+            try
             {
-                var creationTime = Directory.GetCreationTime(path);
-                var lastWriteTime = Directory.GetLastWriteTime(path);
-                return creationTime != lastWriteTime;
+                File.GetCreationTime(path);
+                return true;
             }
-            else if (File.Exists(path))
+            catch (Exception)
             {
-                var creationTime = File.GetCreationTime(path);
-                var lastWriteTime = File.GetLastWriteTime(path);
-                return creationTime != lastWriteTime;
+
+                return false;
             }
-            
-            return false;
         }
 
         public HashSet<string> GetAllFiles(string path)
-        {
-            var files = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            if (!Directory.Exists(path)) return files;
-            
-            var directories = new Stack<string>();
-            directories.Push(path);
-            
-            while (directories.Count > 0)
             {
-                string currentDir = directories.Pop();
-                
-                try
+                var files = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                if (!Directory.Exists(path)) return files;
+            
+                var directories = new Stack<string>();
+                directories.Push(path);
+            
+                while (directories.Count > 0)
                 {
-                    files.UnionWith(Directory.EnumerateFiles(currentDir));
+                    string currentDir = directories.Pop();
+                
+                    try
+                    {
+                        files.UnionWith(Directory.EnumerateFiles(currentDir));
                     
-                    foreach (var dir in Directory.EnumerateDirectories(currentDir))
+                        foreach (var dir in Directory.EnumerateDirectories(currentDir))
+                        {
+                            directories.Push(dir);
+                        }
+                    }
+                    catch (UnauthorizedAccessException ex)
                     {
-                        directories.Push(dir);
+                        throw new UnauthorizedAccessException($"Access to directory {currentDir} is denied: {ex.Message}", ex);
+                    }
+                    catch (IOException ex)
+                    {
+                        throw new IOException($"Error accessing directory {currentDir}: {ex.Message}", ex);
                     }
                 }
-                catch (UnauthorizedAccessException ex)
-                {
-                    throw new UnauthorizedAccessException($"Access to directory {currentDir} is denied: {ex.Message}", ex);
-                }
-                catch (IOException ex)
-                {
-                    throw new IOException($"Error accessing directory {currentDir}: {ex.Message}", ex);
-                }
-            }
             
-            return files;
-        }
+                return files;
+            }
 
-        public HashSet<string> GetAllFolders(string path)
-        {
-            var folders = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            if (!Directory.Exists(path)) return folders;
-            
-            // Add the root folder itself
-            folders.Add(path);
-            
-            // Use an iterative approach with a stack to avoid potential stack overflow
-            var directories = new Stack<string>();
-            directories.Push(path);
-            
-            while (directories.Count > 0)
+            public HashSet<string> GetAllFolders(string path)
             {
-                string currentDir = directories.Pop();
-                
-                try
+            
+                var folders = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                if (!Directory.Exists(path)) return folders;
+            
+                var directories = new Stack<string>();
+                directories.Push(path);
+            
+                while (directories.Count > 0)
                 {
-                    foreach (var dir in Directory.EnumerateDirectories(currentDir))
+                    string currentDir = directories.Pop();
+                
+                    try
                     {
-                        folders.Add(dir);
-                        directories.Push(dir);
+                        foreach (var dir in Directory.EnumerateDirectories(currentDir))
+                        {
+                            folders.Add(dir);
+                            directories.Push(dir);
+                        }
+                    }
+                    catch (UnauthorizedAccessException)
+                    {
+                        throw new UnauthorizedAccessException($"Access to directory {currentDir} is denied");
+                    }
+                    catch (IOException)
+                    {
+                        throw new IOException($"Error accessing directory {currentDir}");
                     }
                 }
-                catch (UnauthorizedAccessException)
-                {
-                    throw new UnauthorizedAccessException($"Access to directory {currentDir} is denied");
-                }
-                catch (IOException)
-                {
-                    throw new IOException($"Error accessing directory {currentDir}");
-                }
-            }
             
-            return folders;
-        }
+                return folders;
+            }
     }
 }

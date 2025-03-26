@@ -50,7 +50,7 @@ namespace FolderSync.Tests.Mocks
             return WriteAllBytesAsync(path, Encoding.UTF8.GetBytes(contents));
         }
 
-        public Task CopyFileAsync(string sourcePath, string destPath, bool overwrite = false)
+        public Task CopyFileAsync(string sourcePath, string destPath)
         {
             string normalizedSourcePath = NormalizePath(sourcePath);
             string normalizedDestPath = NormalizePath(destPath);
@@ -58,9 +58,7 @@ namespace FolderSync.Tests.Mocks
             if (!_files.ContainsKey(normalizedSourcePath))
                 throw new FileNotFoundException($"Source file not found: {sourcePath}");
 
-            if (_files.ContainsKey(normalizedDestPath) && !overwrite)
-                throw new IOException($"Destination file already exists: {destPath}");
-
+          
             CreateDirectoryIfNotExist(normalizedDestPath);
             _files[normalizedDestPath] = _files[normalizedSourcePath].ToArray(); 
             return Task.CompletedTask;
@@ -74,17 +72,14 @@ namespace FolderSync.Tests.Mocks
             return Task.CompletedTask;
         }
 
-        public Task MoveFileAsync(string sourcePath, string destPath, bool overwrite = false)
+        public Task MoveFileAsync(string sourcePath, string destPath)
         {
             string normalizedSourcePath = NormalizePath(sourcePath);
             string normalizedDestPath = NormalizePath(destPath);
 
             if (!_files.ContainsKey(normalizedSourcePath))
                 throw new FileNotFoundException($"Source file not found: {sourcePath}");
-
-            if (_files.ContainsKey(normalizedDestPath) && !overwrite)
-                throw new IOException($"Destination file already exists: {destPath}");
-
+            
             CreateDirectoryIfNotExist(normalizedDestPath);
             _files[normalizedDestPath] = _files[normalizedSourcePath];
             _files.Remove(normalizedSourcePath);
@@ -300,6 +295,17 @@ namespace FolderSync.Tests.Mocks
             return path.Replace('/', Path.DirectorySeparatorChar);
         }
         
+        public DateTime GetLastWriteTimeUtc(string path)
+        {
+            string normalizedPath = NormalizePath(path);
+            if (!_files.ContainsKey(normalizedPath))
+                throw new FileNotFoundException($"File not found: {path}");
+            
+            return _fileTimestamps.TryGetValue(normalizedPath, out var timestamp) 
+                ? timestamp 
+                : DateTime.UtcNow;
+        }
+        
         public FileInfo GetFileInfo(string path)
         {
             string normalizedPath = NormalizePath(path);
@@ -313,7 +319,6 @@ namespace FolderSync.Tests.Mocks
             {
                 File.WriteAllBytes(tempFile, _files[normalizedPath]);
                 
-                // If we have a stored timestamp for this file, apply it to the temp file
                 if (_fileTimestamps.TryGetValue(normalizedPath, out var timestamp))
                 {
                     File.SetLastWriteTimeUtc(tempFile, timestamp);
@@ -323,7 +328,8 @@ namespace FolderSync.Tests.Mocks
             }
             catch
             {
-                return new FileInfo(normalizedPath);
+                var fileInfo = new FileInfo(normalizedPath);
+                return fileInfo;
             }
         }
 
@@ -333,7 +339,6 @@ namespace FolderSync.Tests.Mocks
             if (!_files.ContainsKey(normalizedPath))
                 throw new FileNotFoundException($"File not found: {path}");
             
-            // Store the timestamp in our dictionary
             _fileTimestamps[normalizedPath] = lastWriteTimeUtc;
         }
         
@@ -343,29 +348,10 @@ namespace FolderSync.Tests.Mocks
             if (!DirectoryExists(normalizedPath))
                 throw new DirectoryNotFoundException($"Directory not found: {path}");
             
-            // Create a temporary directory to represent this mock directory
             string tempDir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
             Directory.CreateDirectory(tempDir);
             
             return new DirectoryInfo(tempDir);
-        }
-        
-        public DirectoryInfo[] GetDirectories(DirectoryInfo directory)
-        {
-            // Convert the DirectoryInfo to a path string and use our existing method
-            var dirPaths = GetDirectories(directory.FullName);
-            
-            // Convert each path to a DirectoryInfo
-            return dirPaths.Select(path => new DirectoryInfo(path)).ToArray();
-        }
-        
-        public FileInfo[] GetFiles(DirectoryInfo directory)
-        {
-            // Convert the DirectoryInfo to a path string and use our existing method
-            var filePaths = GetFiles(directory.FullName);
-            
-            // Convert each path to a FileInfo by using our GetFileInfo method
-            return filePaths.Select(path => GetFileInfo(path)).ToArray();
         }
 
         public HashSet<string> GetAllFiles(string path)
@@ -377,66 +363,49 @@ namespace FolderSync.Tests.Mocks
             if (!normalizedPath.EndsWith(Path.DirectorySeparatorChar))
                 normalizedPath += Path.DirectorySeparatorChar;
     
-            // Add files directly in this directory
             files.UnionWith(GetFiles(path));
     
-            // Recursively add files from subdirectories
             foreach (var dir in GetDirectories(path))
                 files.UnionWith(GetAllFiles(dir));
         
             return files;
         }
 
-        public async Task MoveFolderAsync(string sourcePath, string destPath, bool overwrite = false)
+        public async Task MoveFolderAsync(string sourcePath, string destPath)
         {
             string normalizedSourcePath = NormalizePath(sourcePath);
             string normalizedDestPath = NormalizePath(destPath);
             
             if (!DirectoryExists(normalizedSourcePath))
                 throw new DirectoryNotFoundException($"Source directory not found: {sourcePath}");
-                
-            if (DirectoryExists(normalizedDestPath) && !overwrite)
-                throw new IOException($"Destination directory already exists: {destPath}");
-                
-            if (DirectoryExists(normalizedDestPath) && overwrite)
-                DeleteDirectory(normalizedDestPath, true);
                 
             MoveDirectory(normalizedSourcePath, normalizedDestPath);
             
             await Task.CompletedTask;
         }
         
-        public async Task CopyFolderAsync(string sourcePath, string destPath, bool overwrite = false)
+        public async Task CopyFolderAsync(string sourcePath, string destPath)
         {
             string normalizedSourcePath = NormalizePath(sourcePath);
             string normalizedDestPath = NormalizePath(destPath);
             
             if (!DirectoryExists(normalizedSourcePath))
                 throw new DirectoryNotFoundException($"Source directory not found: {sourcePath}");
-                
-            if (DirectoryExists(normalizedDestPath) && !overwrite)
-                throw new IOException($"Destination directory already exists: {destPath}");
-                
-            if (DirectoryExists(normalizedDestPath) && overwrite)
-                DeleteDirectory(normalizedDestPath, true);
-                
-            // Create destination directory
+            
             CreateDirectory(normalizedDestPath);
             
-            // Copy all files
             foreach (var file in GetFiles(normalizedSourcePath))
             {
                 string fileName = Path.GetFileName(file);
                 string destFile = Path.Combine(normalizedDestPath, fileName);
-                await CopyFileAsync(file, destFile, overwrite);
+                await CopyFileAsync(file, destFile);
             }
             
-            // Copy all subdirectories
             foreach (var dir in GetDirectories(normalizedSourcePath))
             {
                 string dirName = Path.GetFileName(dir);
                 string destDir = Path.Combine(normalizedDestPath, dirName);
-                await CopyFolderAsync(dir, destDir, overwrite);
+                await CopyFolderAsync(dir, destDir);
             }
             
             // Copy directory metadata (timestamps)
@@ -465,10 +434,6 @@ namespace FolderSync.Tests.Mocks
             
             string normalizedPath = NormalizePath(path);
             
-            // Add the root folder itself
-            folders.Add(normalizedPath);
-            
-            // Use an iterative approach with a queue
             var directoriesToProcess = new Queue<string>();
             directoriesToProcess.Enqueue(normalizedPath);
             

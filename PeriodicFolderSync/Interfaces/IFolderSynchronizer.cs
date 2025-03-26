@@ -18,8 +18,7 @@ namespace PeriodicFolderSync.Interfaces
         /// <param name="source">Source directory path.</param>
         /// <param name="destination">Destination directory path.</param>
         /// <param name="stats">Statistics object to track synchronization metrics.</param>
-        /// <param name="useOverwrite">If true, overwrites existing folders at the destination.</param>
         /// <returns>A task representing the asynchronous operation.</returns>
-        Task SynchronizeFoldersAsync(string source, string destination, SyncStatistics stats, bool useOverwrite);
+        Task SynchronizeFoldersAsync(string source, string destination, SyncStatistics stats);
     }
 }

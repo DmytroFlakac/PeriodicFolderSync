@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using PeriodicFolderSync.Core;
 using System.Text;
 using PeriodicFolderSync.Interfaces;
+using Xunit;
 
 namespace FolderSync.Tests.IntegrationTests
 {
@@ -100,25 +101,7 @@ namespace FolderSync.Tests.IntegrationTests
                 _fileSystemOperator.CopyFileAsync(sourceFile, destFile));
         }
 
-        // [Fact]
-        // public async Task CopyFileAsync_ShouldOverwriteDestination_WhenOverwriteIsTrue()
-        // {
-        //     string sourceFile = CreateTestFile(_sourceDirectory, "source.txt", "New content");
-        //     string destFile = CreateTestFile(_destinationDirectory, "dest.txt", "Old content");
-        //
-        //     await _fileSystemOperator.CopyFileAsync(sourceFile, destFile, true);
-        //
-        //     Assert.True(File.Exists(destFile));
-        //     
-        //     await Task.Delay(10000);
-        //     
-        //     var sourceContent = await File.ReadAllTextAsync(sourceFile);
-        //     var destContent = await File.ReadAllTextAsync(destFile);
-        //     
-        //     
-        //     Assert.Equal(sourceContent, destContent);
-        // }
-
+       
         [Fact]
         public async Task DeleteFileAsync_ShouldDeleteFile_WhenFileExists()
         {
@@ -188,27 +171,7 @@ namespace FolderSync.Tests.IntegrationTests
             Assert.True(File.Exists(Path.Combine(destDir, "file1.txt")));
             Assert.Equal("Content 1", await File.ReadAllTextAsync(Path.Combine(destDir, "file1.txt")));
         }
-
-        [Fact]
-        public async Task MoveFolderAsync_ShouldOverwriteDestination_WhenOverwriteIsTrue()
-        {
-            string sourceDir = CreateTestDirectory(_sourceDirectory, "ToMove");
-            CreateTestFile(sourceDir, "file.txt", "New content");
-
-            string destDir = CreateTestDirectory(_destinationDirectory, "ExistingDir");
-            CreateTestFile(destDir, "file.txt", "Old content");
-            CreateTestFile(destDir, "extra.txt", "Extra content");
-
-            await _fileSystemOperator.MoveFolderAsync(sourceDir, destDir, true);
-
-            Assert.False(Directory.Exists(sourceDir));
-            Assert.True(Directory.Exists(destDir));
-            Assert.True(File.Exists(Path.Combine(destDir, "file.txt")));
-            Assert.False(File.Exists(Path.Combine(destDir, "extra.txt")));
-            Assert.Equal("New content", await File.ReadAllTextAsync(Path.Combine(destDir, "file.txt")));
-        }
-
-
+        
         [Fact]
         public async Task WithRetryAsync_ShouldRetryOperation_WhenIOExceptionOccurs()
         {
@@ -256,19 +219,7 @@ namespace FolderSync.Tests.IntegrationTests
                 
             Assert.Contains("Path cannot be null or empty", exception.Message);
         }
-
-        [Fact]
-        public async Task CreateDirectoryIfNotExist_ShouldCreateDirectory_WhenParentDirectoryDoesNotExist()
-        {
-            string nestedDir = Path.Combine(_destinationDirectory, "NonExistent", "NestedDir");
-            string sourceFile = CreateTestFile(_sourceDirectory, "source.txt");
-            string destFile = Path.Combine(nestedDir, "dest.txt");
-
-            await _fileSystemOperator.CopyFileAsync(sourceFile, destFile);
-
-            Assert.True(Directory.Exists(Path.GetDirectoryName(destFile)));
-            Assert.True(File.Exists(destFile));
-        }
+        
 
         [Fact]
         public async Task ReadAllBytesAsync_ShouldReturnCorrectBytes()
@@ -302,7 +253,7 @@ namespace FolderSync.Tests.IntegrationTests
         [Fact]
         public async Task WriteAllBytesAsync_ShouldWriteCorrectBytes()
         {
-            byte[] contentBytes = new byte[] { 0x48, 0x65, 0x6C, 0x6C, 0x6F }; // "Hello" in ASCII
+            byte[] contentBytes = "Hello"u8.ToArray(); 
             string filePath = Path.Combine(_sourceDirectory, "written_binary.dat");
         
             await File.WriteAllBytesAsync(filePath, contentBytes);
@@ -328,7 +279,7 @@ namespace FolderSync.Tests.IntegrationTests
         [Fact]
         public void GetFileSize_ShouldReturnCorrectSize()
         {
-            byte[] data = new byte[1024]; // 1KB
+            byte[] data = new byte[1024];
             for (int i = 0; i < data.Length; i++)
             {
                 data[i] = (byte)(i % 256);

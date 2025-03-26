@@ -90,8 +90,18 @@ namespace PeriodicFolderSync.Core
             }
         }
 
-        public async Task<bool> IsFileMatchAsync(string sourceFile, string destFile, IFileSystem fileSystem)
+        public async Task<bool> IsFileMatchAsync(string sourceFile, string destFile, IFileSystem fileSystem, string source, string destination)
         {
+            
+            if (!fileSystem.FileExists(sourceFile) || !fileSystem.FileExists(destFile))
+                return false;
+            
+            string destRelativePath = Path.GetRelativePath(destination, destFile);
+            string expectedSourcePath = Path.Combine(source, destRelativePath);
+            if (fileSystem.FileExists(expectedSourcePath) &&
+                !string.Equals(expectedSourcePath, sourceFile, StringComparison.OrdinalIgnoreCase))
+                return false;
+            
             try
             {
                 return await _fileComparer.AreFilesIdenticalAsync(sourceFile, destFile);

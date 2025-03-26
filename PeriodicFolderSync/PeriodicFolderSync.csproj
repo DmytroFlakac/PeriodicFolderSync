@@ -5,6 +5,16 @@
         <TargetFramework>net8.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
+        <RuntimeIdentifiers>win-x64;win-x86;linux-x64;osx-x64</RuntimeIdentifiers>
+        
+        <!-- Publishing properties for single-file cross-platform deployment -->
+        <PublishSingleFile>true</PublishSingleFile>
+        <SelfContained>true</SelfContained>
+        <PublishTrimmed>true</PublishTrimmed>
+        <TrimMode>partial</TrimMode>
+        <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+        <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+        <UseAppHost>true</UseAppHost>
     </PropertyGroup>
 
     <ItemGroup>
@@ -15,7 +25,6 @@
       <PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.3" />
       <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="9.0.3" />
       <PackageReference Include="System.CommandLine" Version="2.0.0-beta4.22272.1" />
-      <PackageReference Include="System.Data.SQLite" Version="1.0.119" />
     </ItemGroup>
 
 </Project>

@@ -15,13 +15,15 @@ namespace PeriodicFolderSync.Core
         private readonly IFileSynchronizer _fileSynchronizer = fileSynchronizer ?? throw new ArgumentNullException(nameof(fileSynchronizer));
         private readonly ILogger<ISynchronizer> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
-        public async Task SynchronizeAsync(string source, string destination, bool useOverwrite)
+        public async Task SynchronizeAsync(string source, string destination)
         {
-            _logger.LogInformation($"Starting synchronization from {source} to {destination} with overwrite={useOverwrite}");
+            _logger.LogInformation($"Starting synchronization from {source} to {destination}");
             var stats = new SyncStatistics();
 
-            await _folderSynchronizer.SynchronizeFoldersAsync(source, destination, stats, useOverwrite);
-            await _fileSynchronizer.SynchronizeFilesAsync(source, destination, stats, useOverwrite);
+            
+
+            await _folderSynchronizer.SynchronizeFoldersAsync(source, destination, stats);
+            await _fileSynchronizer.SynchronizeFilesAsync(source, destination, stats);
 
             LogSummary(stats);
             _logger.LogInformation("Synchronization completed");

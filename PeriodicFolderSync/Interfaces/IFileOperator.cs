@@ -10,11 +10,10 @@ public interface IFileOperator
     /// </summary>
     /// <param name="sourcePath">The path of the file to copy.</param>
     /// <param name="destPath">The destination path where the file will be copied to.</param>
-    /// <param name="overwrite">If true, overwrites the destination file if it exists; otherwise, throws an exception.</param>
     /// <returns>A task representing the asynchronous operation.</returns>
     /// <exception cref="System.IO.FileNotFoundException">Thrown when the source file does not exist.</exception>
     /// <exception cref="System.IO.IOException">Thrown when the destination file exists and overwrite is false.</exception>
-    Task CopyFileAsync(string sourcePath, string destPath, bool overwrite = false);
+    Task CopyFileAsync(string sourcePath, string destPath);
     
     /// <summary>
     /// Asynchronously deletes a file at the specified path.
@@ -28,10 +27,9 @@ public interface IFileOperator
     /// </summary>
     /// <param name="sourcePath">The path of the file to move.</param>
     /// <param name="destPath">The destination path where the file will be moved to.</param>
-    /// <param name="overwrite">If true, overwrites the destination file if it exists; otherwise, throws an exception.</param>
     /// <returns>A task representing the asynchronous operation.</returns>
     /// <exception cref="System.IO.FileNotFoundException">Thrown when the source file does not exist.</exception>
     /// <exception cref="System.IO.IOException">Thrown when the destination file exists and overwrite is false.</exception>
-    Task MoveFileAsync(string sourcePath, string destPath, bool overwrite = false);
+    Task MoveFileAsync(string sourcePath, string destPath);
     
 }

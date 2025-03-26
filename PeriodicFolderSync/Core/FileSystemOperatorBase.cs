@@ -97,10 +97,9 @@ public abstract class FileSystemOperatorBase(ILogger logger, int retryCount = 3,
     /// <param name="source">The source path</param>
     /// <param name="dest">The destination path</param>
     /// <param name="operation">The name of the operation</param>
-    /// <param name="overwrite">Whether the operation should overwrite existing files</param>
     /// <remarks>
     /// This method should be implemented by derived classes to provide
     /// operation-specific validation logic.
     /// </remarks>
-    protected abstract void Validate(string source, string dest, string operation, bool overwrite = false);
+    protected abstract void Validate(string source, string dest, string operation);
 }

@@ -3,7 +3,7 @@
 /// <summary>
 /// Interface for folder operations that abstracts common directory manipulation tasks.
 /// This interface provides methods to:
-/// - Copy folders with various options (recursive, overwrite)
+/// - Copy folders with various options (recursive)
 /// - Delete folders safely
 /// - Move folders between locations
 /// - Handle error conditions like missing directories or permission issues
@@ -15,11 +15,9 @@ public interface IFolderOperator
     /// </summary>
     /// <param name="sourcePath">The path of the folder to copy.</param>
     /// <param name="destPath">The destination path where the folder will be copied to.</param>
-    /// <param name="overwrite">If true, overwrites files and folders at the destination if they exist; otherwise, throws an exception.</param>
     /// <returns>A task representing the asynchronous operation.</returns>
     /// <exception cref="System.IO.DirectoryNotFoundException">Thrown when the source folder does not exist.</exception>
-    /// <exception cref="System.IO.IOException">Thrown when the destination folder exists and overwrite is false.</exception>
-    Task CopyFolderAsync(string sourcePath, string destPath, bool overwrite = false);
+    Task CopyFolderAsync(string sourcePath, string destPath);
     
     /// <summary>
     /// Asynchronously deletes a folder at the specified path.
@@ -35,11 +33,9 @@ public interface IFolderOperator
     /// </summary>
     /// <param name="sourcePath">The path of the folder to move.</param>
     /// <param name="destPath">The destination path where the folder will be moved to.</param>
-    /// <param name="overwrite">If true, overwrites the destination folder if it exists; otherwise, throws an exception.</param>
     /// <returns>A task representing the asynchronous operation.</returns>
     /// <exception cref="System.IO.DirectoryNotFoundException">Thrown when the source folder does not exist.</exception>
-    /// <exception cref="System.IO.IOException">Thrown when the destination folder exists and overwrite is false.</exception>
-    Task MoveFolderAsync(string sourcePath, string destPath, bool overwrite = false);
+    Task MoveFolderAsync(string sourcePath, string destPath);
     
     
 }

@@ -4,17 +4,20 @@ using System.Security.Cryptography;
 
 namespace PeriodicFolderSync.Core
 {
-    public class FileComparer(ILogger<IFileComparer> logger, IFileSystem? fileSystem = null) : IFileComparer
+    public class FileComparer(ILogger<IFileComparer> logger, IFileSystem fileSystem) : IFileComparer
     {
-        private readonly IFileSystem _fileSystem = fileSystem ?? new FileSystem();
+        private readonly IFileSystem _fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
         private const int BufferSize = 8192;
+
+        public FileComparer(ILogger<IFileComparer> logger) : this(logger, new FileSystem())
+        {
+        }
 
         public async Task<bool> AreFilesIdenticalAsync(string file1Path, string file2Path)
         {
             try
             {
-                if (string.Equals(file1Path, file2Path, StringComparison.OrdinalIgnoreCase))
-                    return true;
+                
 
                 if (!_fileSystem.FileExists(file1Path) || !_fileSystem.FileExists(file2Path))
                     return false;
@@ -24,7 +27,6 @@ namespace PeriodicFolderSync.Core
                 
                 if (file1Info.Length != file2Info.Length)
                     return false;
-                
                 
                 if (file1Info.LastWriteTimeUtc == file2Info.LastWriteTimeUtc)
                     return true;
@@ -59,6 +61,7 @@ namespace PeriodicFolderSync.Core
                 logger.LogError(ex, $"Error calculating hash for file {filePath}");
                 throw;
             }
+                
         }
 
         /// <summary>
@@ -67,6 +70,7 @@ namespace PeriodicFolderSync.Core
         /// <param name="file1Path">Path to the first file.</param>
         /// <param name="file2Path">Path to the second file.</param>
         /// <returns>True if the file contents are identical, false otherwise.</returns>
+        /// <exception cref="IOException">Thrown when an I/O error occurs while reading the files</exception>
         private async Task<bool> CompareFileContentsAsync(string file1Path, string file2Path)
         {
             try

@@ -11,15 +11,13 @@ namespace PeriodicFolderSync.Core
         private Timer? _timer;
         private string _source = null!;
         private string _destination = null!;
-        private bool _useOverwrite;
         private bool _isSyncing;
-        private readonly object _syncLock = new object();
+        private readonly object _syncLock = new();
 
-        public async Task Start(string source, string destination, TimeSpan interval, bool useOverwrite)
+        public async Task Start(string source, string destination, TimeSpan interval)
         {
             _source = source;
             _destination = destination;
-            _useOverwrite = useOverwrite;
 
             _logger.LogInformation($"Starting scheduler with interval: {interval}");
             
@@ -56,7 +54,6 @@ namespace PeriodicFolderSync.Core
             _timer = null;
             _source = null!;
             _destination = null!;
-            _useOverwrite = false;
         }
 
         /// <summary>
@@ -78,7 +75,7 @@ namespace PeriodicFolderSync.Core
             try
             {
                 _logger.LogInformation($"Scheduled sync starting at {DateTime.Now}");
-                await _synchronizer.SynchronizeAsync(_source, _destination, _useOverwrite);
+                await _synchronizer.SynchronizeAsync(_source, _destination);
                 _logger.LogInformation($"Scheduled sync completed at {DateTime.Now}");
             }
             catch (Exception ex)

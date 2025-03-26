@@ -3,6 +3,7 @@ using Moq;
 using PeriodicFolderSync.Core;
 using FolderSync.Tests.Mocks;
 using PeriodicFolderSync.Interfaces;
+using Xunit;
 
 namespace FolderSync.Tests.UnitTests
 {
@@ -108,32 +109,7 @@ namespace FolderSync.Tests.UnitTests
             await Assert.ThrowsAsync<DirectoryNotFoundException>(() =>
                 _folderOperator.CopyFolderAsync(nonExistentDir, destDir));
         }
-
-        [Fact]
-        public async Task CopyFolderAsync_ShouldThrowException_WhenDestinationDirectoryExists()
-        {
-            string destDir = CreateTestDirectory(_destinationDirectory, "ExistingDir");
-
-            await Assert.ThrowsAsync<IOException>(() =>
-                _folderOperator.CopyFolderAsync(_sourceDirectory, destDir, false));
-        }
-
-        [Fact]
-        public async Task CopyFolderAsync_ShouldOverwriteDestination_WhenOverwriteIsTrue()
-        {
-            string sourceFile = CreateTestFile(_sourceDirectory, "file.txt", "New content");
-
-            string destDir = CreateTestDirectory(_destinationDirectory, "ExistingDir");
-            CreateTestFile(destDir, "file.txt", "Old content");
-            CreateTestFile(destDir, "extra.txt", "Extra content");
-
-            await _folderOperator.CopyFolderAsync(_sourceDirectory, destDir, true);
-
-            Assert.True(_mockFileSystem.DirectoryExists(destDir));
-            Assert.True(_mockFileSystem.FileExists(Path.Combine(destDir, "file.txt")));
-            Assert.False(_mockFileSystem.FileExists(Path.Combine(destDir, "extra.txt")));
-            Assert.Equal("New content", await _mockFileSystem.ReadAllTextAsync(Path.Combine(destDir, "file.txt")));
-        }
+        
 
         [Fact]
         public async Task DeleteFolderAsync_ShouldDeleteFolder_WhenFolderExists()
@@ -164,7 +140,7 @@ namespace FolderSync.Tests.UnitTests
 
             string destDir = Path.Combine(_destinationDirectory, "MovedDir");
 
-            await _folderOperator.MoveFolderAsync(sourceSubDir, destDir, false);
+            await _folderOperator.MoveFolderAsync(sourceSubDir, destDir);
 
             Assert.False(_mockFileSystem.DirectoryExists(sourceSubDir));
             Assert.True(_mockFileSystem.DirectoryExists(destDir));
@@ -179,7 +155,7 @@ namespace FolderSync.Tests.UnitTests
             string destDir = Path.Combine(_destinationDirectory, "MovedDir");
 
             await Assert.ThrowsAsync<DirectoryNotFoundException>(() =>
-                _folderOperator.MoveFolderAsync(nonExistentDir, destDir , false));
+                _folderOperator.MoveFolderAsync(nonExistentDir, destDir));
         }
 
         [Fact]
@@ -189,26 +165,7 @@ namespace FolderSync.Tests.UnitTests
             string destDir = CreateTestDirectory(_destinationDirectory, "ExistingDir");
 
             await Assert.ThrowsAsync<IOException>(() =>
-                _folderOperator.MoveFolderAsync(sourceDir, destDir, false));
-        }
-
-        [Fact]
-        public async Task MoveFolderAsync_ShouldOverwriteDestination_WhenOverwriteIsTrue()
-        {
-            string sourceDir = CreateTestDirectory(_sourceDirectory, "ToMove");
-            CreateTestFile(sourceDir, "file.txt", "New content");
-
-            string destDir = CreateTestDirectory(_destinationDirectory, "ExistingDir");
-            CreateTestFile(destDir, "file.txt", "Old content");
-            CreateTestFile(destDir, "extra.txt", "Extra content");
-
-            await _folderOperator.MoveFolderAsync(sourceDir, destDir, true);
-
-            Assert.False(_mockFileSystem.DirectoryExists(sourceDir));
-            Assert.True(_mockFileSystem.DirectoryExists(destDir));
-            Assert.True(_mockFileSystem.FileExists(Path.Combine(destDir, "file.txt")));
-            Assert.False(_mockFileSystem.FileExists(Path.Combine(destDir, "extra.txt")));
-            Assert.Equal("New content", await _mockFileSystem.ReadAllTextAsync(Path.Combine(destDir, "file.txt")));
+                _folderOperator.MoveFolderAsync(sourceDir, destDir));
         }
 
         [Fact]
@@ -220,7 +177,7 @@ namespace FolderSync.Tests.UnitTests
             string destParent = Path.Combine(_destinationDirectory, "NewParent");
             string destDir = Path.Combine(destParent, "MovedDir");
 
-            await _folderOperator.MoveFolderAsync(sourceDir, destDir, false);
+            await _folderOperator.MoveFolderAsync(sourceDir, destDir);
 
             Assert.False(_mockFileSystem.DirectoryExists(sourceDir));
             Assert.True(_mockFileSystem.DirectoryExists(destParent));
@@ -352,7 +309,7 @@ namespace FolderSync.Tests.UnitTests
             _mockFileSystem.SetLastWriteTimeUtc(sourceFile, now);
             _mockFileSystem.SetLastWriteTimeUtc(destFile, now);
             
-            await _folderOperator.CopyFolderAsync(_sourceDirectory, destDir, overwrite: true);
+            await _folderOperator.CopyFolderAsync(_sourceDirectory, destDir);
             
             var sourceBytes = await _mockFileSystem.ReadAllBytesAsync(sourceFile);
             var destBytes = await _mockFileSystem.ReadAllBytesAsync(destFile);
@@ -379,7 +336,7 @@ namespace FolderSync.Tests.UnitTests
             var originalDestContent = await _mockFileSystem.ReadAllTextAsync(destFile);
             Assert.Equal("Old content", originalDestContent);
 
-            await _folderOperator.CopyFolderAsync(_sourceDirectory, destDir, overwrite: true);
+            await _folderOperator.CopyFolderAsync(_sourceDirectory, destDir);
 
             var newDestContent = await _mockFileSystem.ReadAllTextAsync(destFile);
             Assert.Equal("New content", newDestContent);
@@ -403,7 +360,7 @@ namespace FolderSync.Tests.UnitTests
             byte[] destBytes = await _mockFileSystem.ReadAllBytesAsync(destFile);
             Assert.NotEqual(sourceBytes.Length, destBytes.Length);
 
-            await _folderOperator.CopyFolderAsync(_sourceDirectory, destDir, overwrite: true);
+            await _folderOperator.CopyFolderAsync(_sourceDirectory, destDir);
 
             Assert.True(await CompareFiles(sourceFile, destFile));
             var newDestInfo = _mockFileSystem.GetFileInfo(destFile);

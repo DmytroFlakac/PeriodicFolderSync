@@ -9,12 +9,27 @@ namespace PeriodicFolderSync
 {
     public static class Program
     {
-        public static async Task Main(string[] args)
+        public static async Task Main(string?[] args)
         {
             var serviceProvider = ConfigureServices();
-            var cliProcessor = serviceProvider.GetRequiredService<ICliProcessor>();
-            var exitCode = await cliProcessor.ProcessAsync(args);
-            Environment.Exit(exitCode);
+            var cliProcessor = serviceProvider.GetRequiredService<ICLIProcessor>();
+            
+            try
+            {
+                args = await cliProcessor.GetInteractiveInputIfNeededAsync(args);
+                
+                if (args.Length == 0)
+                {
+                    Environment.Exit(1);
+                }
+                
+                var exitCode = await cliProcessor.ProcessAsync(args);
+                Environment.Exit(exitCode);
+            }
+            catch (Exception)
+            {
+                Environment.Exit(-1);
+            }
         }
 
         private static ServiceProvider ConfigureServices()
@@ -30,8 +45,9 @@ namespace PeriodicFolderSync
             services.AddSingleton<IFolderSynchronizer, FolderSynchronizer>();
             services.AddSingleton<IFileSynchronizer, FileSynchronizer>();
             services.AddSingleton<ISynchronizer, Synchronizer>();
-            services.AddSingleton<ICliProcessor, CliProcessor>();
+            services.AddSingleton<ICLIProcessor, CLIProcessor>();
             services.AddSingleton<IScheduler, Scheduler>();
+            services.AddSingleton<IAdminPrivilegeHandler, AdminPrivilegeHandler>();
 
             return services.BuildServiceProvider();
         }

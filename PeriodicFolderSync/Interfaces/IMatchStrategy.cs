@@ -36,6 +36,8 @@ namespace PeriodicFolderSync.Interfaces
         /// <param name="sourceFile">The full path to the source file.</param>
         /// <param name="destFile">The full path to the destination file.</param>
         /// <param name="fileSystem">The file system interface to use for operations.</param>
+        /// <param name="source">Optional. The root source directory path for relative path comparison.</param>
+        /// <param name="destination">Optional. The root destination directory path for relative path comparison.</param>
         /// <returns>
         /// A task that represents the asynchronous operation. The task result contains a boolean value:
         /// true if the files match, false otherwise.
@@ -43,6 +45,6 @@ namespace PeriodicFolderSync.Interfaces
         /// <remarks>
         /// File matching typically compares file size and last write time to determine if files are identical.
         /// </remarks>
-        Task<bool> IsFileMatchAsync(string sourceFile, string destFile, IFileSystem fileSystem);
+        Task<bool> IsFileMatchAsync(string sourceFile, string destFile, IFileSystem fileSystem, string source, string destination);
     }
 }

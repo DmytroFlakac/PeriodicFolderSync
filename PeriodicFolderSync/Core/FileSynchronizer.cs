@@ -9,15 +9,20 @@ namespace PeriodicFolderSync.Core
         IFileSystem fileSystem,
         IMatchStrategy matchStrategy,
         ILogger<IFileSynchronizer> logger
-        )
+    )
         : IFileSynchronizer
     {
-        private readonly IFileOperator _fileOperator = fileOperator ?? throw new ArgumentNullException(nameof(fileOperator));
+        private readonly IFileOperator _fileOperator =
+            fileOperator ?? throw new ArgumentNullException(nameof(fileOperator));
+
         private readonly IFileSystem _fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
-        private readonly IMatchStrategy _matchStrategy = matchStrategy ?? throw new ArgumentNullException(nameof(matchStrategy));
+
+        private readonly IMatchStrategy _matchStrategy =
+            matchStrategy ?? throw new ArgumentNullException(nameof(matchStrategy));
+
         private readonly ILogger<IFileSynchronizer> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
-        public async Task SynchronizeFilesAsync(string source, string destination, SyncStatistics stats, bool useOverwrite)
+        public async Task SynchronizeFilesAsync(string source, string destination, SyncStatistics stats)
         {
             var sourceFiles = _fileSystem.GetAllFiles(source);
             var destFiles = _fileSystem.GetAllFiles(destination);
@@ -36,7 +41,8 @@ namespace PeriodicFolderSync.Core
 
                 if (!_fileSystem.FileExists(destFile))
                 {
-                    await HandleMissingDestinationFile(sourceFile, destFile, destFilesBySize, processedDestFiles, stats, useOverwrite);
+                    await HandleMissingDestinationFile(sourceFile, destFile, destFilesBySize, processedDestFiles, stats,
+                        source, destination);
                 }
                 else
                 {
@@ -47,7 +53,8 @@ namespace PeriodicFolderSync.Core
                 processedCount++;
                 if (processedCount % 100 == 0 || processedCount == totalFiles)
                 {
-                    _logger.LogInformation($"Processed {processedCount}/{totalFiles} files ({(int)(processedCount * 100.0 / totalFiles)}%)");
+                    _logger.LogInformation(
+                        $"Processed {processedCount}/{totalFiles} files ({(int)(processedCount * 100.0 / totalFiles)}%)");
                 }
             }
 
@@ -76,7 +83,8 @@ namespace PeriodicFolderSync.Core
         /// <param name="destFilesBySize">Dictionary of destination files grouped by size.</param>
         /// <param name="processedDestFiles">Set of destination files that have already been processed.</param>
         /// <param name="stats">Statistics object to track synchronization metrics.</param>
-        /// <param name="useOverwrite">If true, overwrites existing files at the destination.</param>
+        /// <param name="source">The source directory path.</param>
+        /// <param name="destination">The destination directory path.</param>
         /// <returns>A task representing the asynchronous operation.</returns>
         private async Task HandleMissingDestinationFile(
             string sourceFile,
@@ -84,30 +92,72 @@ namespace PeriodicFolderSync.Core
             Dictionary<long, List<string>> destFilesBySize,
             HashSet<string> processedDestFiles,
             SyncStatistics stats,
-            bool useOverwrite)
+            string source,
+            string destination)
         {
-            var sourceInfo = _fileSystem.GetFileInfo(sourceFile);
-            if (destFilesBySize.TryGetValue(sourceInfo.Length, out var sizeMatches))
+            try
             {
-                foreach (var potentialMatch in sizeMatches.ToList())
+                var sourceInfo = _fileSystem.GetFileInfo(sourceFile);
+                if (destFilesBySize.TryGetValue(sourceInfo.Length, out var sizeMatches))
                 {
-                    if (processedDestFiles.Contains(potentialMatch))
-                        continue;
-
-                    if (await _matchStrategy.IsFileMatchAsync(sourceFile, potentialMatch, _fileSystem))
+                    foreach (var potentialMatch in sizeMatches.ToList())
                     {
-                        _logger.LogInformation($"Moving/renaming FILE: {potentialMatch} to {destFile}");
-                        await _fileOperator.MoveFileAsync(potentialMatch, destFile, useOverwrite);
-                        processedDestFiles.Add(potentialMatch);
-                        sizeMatches.Remove(potentialMatch);
-                        stats.FilesMoved++;
-                        return;
+                        if (processedDestFiles.Contains(potentialMatch))
+                            continue;
+
+                        try
+                        {
+                            if (await _matchStrategy.IsFileMatchAsync(sourceFile, potentialMatch, _fileSystem, source,
+                                    destination))
+                            {
+                                _logger.LogInformation($"Moving/renaming FILE: {potentialMatch} to {destFile}");
+                                try
+                                {
+                                    await _fileOperator.MoveFileAsync(potentialMatch, destFile);
+                                    processedDestFiles.Add(potentialMatch);
+                                    sizeMatches.Remove(potentialMatch);
+                                    stats.FilesMoved++;
+                                    return;
+                                }
+                                catch (Exception ex)
+                                {
+                                    _logger.LogError(ex,
+                                        $"Failed to move file from {potentialMatch} to {destFile}. Falling back to copy operation.");
+                                }
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning(ex,
+                                $"Error comparing files {sourceFile} and {potentialMatch}. Skipping this potential match.");
+                        }
                     }
                 }
+
+                _logger.LogInformation($"Copying new file: {sourceFile} to {destFile}");
+                await _fileOperator.CopyFileAsync(sourceFile, destFile);
+                stats.ChangedCount++;
             }
-            _logger.LogInformation($"Copying new file: {sourceFile} to {destFile}");
-            await _fileOperator.CopyFileAsync(sourceFile, destFile, useOverwrite);
-            stats.ChangedCount++;
+            catch (FileNotFoundException ex)
+            {
+                _logger.LogError(ex, $"Source file not found: {sourceFile}");
+                throw;
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                _logger.LogError(ex, $"Access denied when handling file: {sourceFile} to {destFile}");
+                throw;
+            }
+            catch (IOException ex)
+            {
+                _logger.LogError(ex, $"IO error when handling file: {sourceFile} to {destFile}");
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Unexpected error when handling file: {sourceFile} to {destFile}");
+                throw;
+            }
         }
 
         /// <summary>
@@ -119,18 +169,24 @@ namespace PeriodicFolderSync.Core
         /// <returns>A task representing the asynchronous operation.</returns>
         private async Task UpdateFileIfModified(string sourceFile, string destFile, SyncStatistics stats)
         {
-            var sourceInfo = _fileSystem.GetFileInfo(sourceFile);
-            var destInfo = _fileSystem.GetFileInfo(destFile);
-
-            if (sourceInfo.Length != destInfo.Length || sourceInfo.LastWriteTimeUtc != destInfo.LastWriteTimeUtc)
+            try
             {
-                _logger.LogInformation($"Updating modified file: {destFile}");
-                await _fileOperator.CopyFileAsync(sourceFile, destFile, true);
-                stats.ChangedCount++;
+                if (_fileSystem.GetFileInfo(sourceFile).Length != _fileSystem.GetFileInfo(destFile).Length ||
+                    _fileSystem.GetFileInfo(sourceFile).LastWriteTimeUtc !=
+                    _fileSystem.GetFileInfo(destFile).LastWriteTimeUtc)
+                {
+                    _logger.LogInformation($"Updating modified file: {destFile}");
+                    await _fileOperator.CopyFileAsync(sourceFile, destFile);
+                    stats.ChangedCount++;
+                }
+            }
+            catch (Exception exception)
+            {
+                _logger.LogError(exception, $"Failed to update file: {destFile}");
             }
         }
 
-        /// <summary>
+    /// <summary>
         /// Processes files in the destination that don't exist in the source, deleting them if necessary.
         /// </summary>
         /// <param name="destFiles">Set of all destination files.</param>

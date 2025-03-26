@@ -3,6 +3,7 @@ using Moq;
 using PeriodicFolderSync.Core;
 using FolderSync.Tests.Mocks;
 using PeriodicFolderSync.Interfaces;
+using Xunit;
 
 namespace FolderSync.Tests.UnitTests
 {
@@ -79,29 +80,8 @@ namespace FolderSync.Tests.UnitTests
             await Assert.ThrowsAsync<FileNotFoundException>(() => 
                 _fileOperator.CopyFileAsync(sourceFile, destFile));
         }
-
-        [Fact]
-        public async Task CopyFileAsync_ShouldThrowException_WhenDestinationFileExists()
-        {
-            string sourceFile = CreateTestFile(_sourceDirectory, "source.txt");
-            string destFile = CreateTestFile(_destinationDirectory, "dest.txt");
-
-            await Assert.ThrowsAsync<IOException>(() => 
-                _fileOperator.CopyFileAsync(sourceFile, destFile, false));
-        }
-
-        [Fact]
-        public async Task CopyFileAsync_ShouldOverwriteDestination_WhenOverwriteIsTrue()
-        {
-            string sourceFile = CreateTestFile(_sourceDirectory, "source.txt", "New content");
-            string destFile = CreateTestFile(_destinationDirectory, "dest.txt", "Old content");
-
-            await _fileOperator.CopyFileAsync(sourceFile, destFile, true);
-
-            Assert.True(_mockFileSystem.FileExists(destFile));
-            Assert.Equal("New content", await _mockFileSystem.ReadAllTextAsync(destFile));
-        }
-
+        
+       
         [Fact]
         public async Task CopyFileAsync_ShouldCreateDestinationDirectory_WhenItDoesNotExist()
         {
@@ -156,26 +136,14 @@ namespace FolderSync.Tests.UnitTests
                 _fileOperator.MoveFileAsync(sourceFile, destFile));
         }
 
-        [Fact]
-        public async Task MoveFileAsync_ShouldOverwriteDestination_WhenOverwriteIsTrue()
-        {
-            string sourceFile = CreateTestFile(_sourceDirectory, "toMove.txt", "New content");
-            string destFile = CreateTestFile(_destinationDirectory, "moved.txt", "Old content");
-
-            await _fileOperator.MoveFileAsync(sourceFile, destFile, true);
-
-            Assert.False(_mockFileSystem.FileExists(sourceFile));
-            Assert.True(_mockFileSystem.FileExists(destFile));
-            Assert.Equal("New content", await _mockFileSystem.ReadAllTextAsync(destFile));
-        }
-
+        
         [Fact]
         public async Task CopyFileAsync_ShouldHandleLargeFiles()
         {
             string sourceFile = Path.Combine(_sourceDirectory, "large.bin");
             string destFile = Path.Combine(_destinationDirectory, "large_copy.bin");
             
-            byte[] largeContent = new byte[5 * 1024 * 1024]; // 5MB
+            byte[] largeContent = new byte[5 * 1024 * 1024]; 
             new Random().NextBytes(largeContent);
             await _mockFileSystem.WriteAllBytesAsync(sourceFile, largeContent);
 
