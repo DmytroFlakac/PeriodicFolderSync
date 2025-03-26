@@ -14,7 +14,6 @@ For the fastest installation, use our PowerShell build script:
 ### Windows
 ```powershell
 git clone https://github.com/DmytroFlakac/PeriodicFolderSync.git
-cd PeriodicFolderSync
 .\publish-all.ps1 -Windows
 .\publish\win-x64\PeriodicFolderSync.exe -s "C:\Source" -d "D:\Backup"
  ```
@@ -22,7 +21,6 @@ cd PeriodicFolderSync
 ### Linux
 ```bash
 git clone https://github.com/DmytroFlakac/PeriodicFolderSync.git
-cd PeriodicFolderSync
 pwsh ./publish-all.ps1 -Linux
 ./publish/linux-x64/PeriodicFolderSync -s "/home/user/docs" -d "/mnt/backup"
  ```
@@ -30,7 +28,6 @@ pwsh ./publish-all.ps1 -Linux
 ### macOS
 ```bash
 git clone https://github.com/DmytroFlakac/PeriodicFolderSync.git
-cd PeriodicFolderSync
 pwsh ./publish-all.ps1 -Mac
 ./publish/osx-x64/PeriodicFolderSync -s "/Users/username/Documents" -d "/Volumes/Backup"
  ```
@@ -47,7 +44,6 @@ dotnet publish -c Release -r win-x64 --self-contained true /p:PublishSingleFile=
 ### Linux
 ```bash
 git clone https://github.com/DmytroFlakac/PeriodicFolderSync.git
-cd PeriodicFolderSync
 dotnet publish -c Release -r linux-x64 --self-contained true
 chmod +x ./publish/linux-x64/PeriodicFolderSync
 ./publish/linux-x64/PeriodicFolderSync -s "/home/user/docs" -d "/mnt/backup"
@@ -56,7 +52,6 @@ chmod +x ./publish/linux-x64/PeriodicFolderSync
 ### macOS
 ```bash
 git clone https://github.com/DmytroFlakac/PeriodicFolderSync.git
-cd PeriodicFolderSync
 dotnet publish -c Release -r osx-x64 --self-contained true
 chmod +x ./publish/osx-x64/PeriodicFolderSync
 ./publish/osx-x64/PeriodicFolderSync -s "/Users/username/Documents" -d "/Volumes/Backup"
